@@ -1,0 +1,9 @@
+# Gradle outputs and local caches, at any module depth.
+build/
+.gradle/
+
+# Incidental operating-system files.
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
