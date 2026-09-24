@@ -15,8 +15,9 @@ public final class SchemaValidator {
         if (actual == null || !actual.isObject()) {
             throw new JsvroException("JSVRO stream must start with a schema object");
         }
-        if (!expected.jsvro().equals(actual.path("jsvro").asText())) {
-            throw new JsvroException("Unsupported JSVRO version: " + actual.path("jsvro").asText());
+        JsonNode version = actual.path("jsvro");
+        if (!version.isString() || !expected.jsvro().equals(version.stringValue())) {
+            throw new JsvroException("Unsupported JSVRO version: expected \"" + expected.jsvro() + "\" but got " + describe(version));
         }
 
         JsonNode columns = actual.path("columns");
@@ -27,6 +28,9 @@ public final class SchemaValidator {
     }
 
     private static void validateColumns(List<JsvroColumn> expected, JsonNode actual, String path) {
+        if (!actual.isArray()) {
+            throw mismatch(path, "a columns array", actual);
+        }
         if (actual.size() != expected.size()) {
             throw new JsvroException(
                     "Schema mismatch at " + path + ": expected " + expected.size() + " columns but got " + actual.size());
@@ -37,35 +41,35 @@ public final class SchemaValidator {
             JsonNode actualColumn = actual.get(i);
             String columnPath = path + "[" + i + "]";
 
-            if (!expectedColumn.name().equals(actualColumn.path("name").asText())) {
-                throw new JsvroException("Schema mismatch at " + columnPath + ".name");
+            JsonNode name = actualColumn.path("name");
+            if (!name.isString() || !expectedColumn.name().equals(name.stringValue())) {
+                throw mismatch(columnPath + ".name", "\"" + expectedColumn.name() + "\"", name);
             }
-            if (!expectedColumn.type().wireName().equals(actualColumn.path("type").asText())) {
-                throw new JsvroException("Schema mismatch at " + columnPath + ".type");
-            }
-
-            if (!expectedColumn.columns().isEmpty()) {
-                validateColumns(expectedColumn.columns(), actualColumn.path("columns"), columnPath + ".columns");
-            }
-
-            if (expectedColumn.items() != null) {
-                validateItem(expectedColumn.items(), actualColumn.path("items"), columnPath + ".items");
-            }
+            validateShape(expectedColumn, actualColumn, columnPath);
         }
     }
 
-    private static void validateItem(JsvroColumn expected, JsonNode actual, String path) {
+    private static void validateShape(JsvroColumn expected, JsonNode actual, String path) {
         if (!actual.isObject()) {
-            throw new JsvroException("Schema mismatch at " + path + ": expected item object");
+            throw mismatch(path, "a column object", actual);
         }
-        if (!expected.type().wireName().equals(actual.path("type").asText())) {
-            throw new JsvroException("Schema mismatch at " + path + ".type");
+        JsonNode type = actual.path("type");
+        if (!type.isString() || !expected.type().wireName().equals(type.stringValue())) {
+            throw mismatch(path + ".type", "\"" + expected.type().wireName() + "\"", type);
         }
         if (!expected.columns().isEmpty()) {
             validateColumns(expected.columns(), actual.path("columns"), path + ".columns");
         }
         if (expected.items() != null) {
-            validateItem(expected.items(), actual.path("items"), path + ".items");
+            validateShape(expected.items(), actual.path("items"), path + ".items");
         }
+    }
+
+    private static JsvroException mismatch(String path, String expected, JsonNode actual) {
+        return new JsvroException("Schema mismatch at " + path + ": expected " + expected + " but got " + describe(actual));
+    }
+
+    private static String describe(JsonNode node) {
+        return node.isMissingNode() ? "nothing" : node.toString();
     }
 }

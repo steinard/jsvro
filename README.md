@@ -50,6 +50,7 @@ Add the starter:
 ```kotlin
 dependencies {
     implementation("dev.jsvro:jsvro-spring-boot-starter:0.1.0")
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
 }
 ```
 
@@ -127,27 +128,26 @@ public record Person(String name, int age) {}
 
 Schema/codec derivation is cached by Jackson `JavaType`; it is not repeated per row. The hot encoding path writes directly to Jackson's `JsonGenerator` and does not construct `JsonNode` trees.
 
-The v1 decoder validates the incoming schema and expands **one row at a time** to a Jackson tree before binding it to the target Java type. This keeps decoder memory bounded while leaving room for a future token-to-token decoder optimization.
+The v1 decoder validates the incoming schema, then buffers **one row at a time** as named Jackson tokens and binds them to the target Java type. `readStream` decodes lazily; `readList` collects every row.
 
 ## Current constraints
 
 - root rows must be object/record-like types
 - recursive/cyclic object schemas are rejected in v1
-- polymorphic interface/abstract properties need a future schema extension
+- polymorphic, abstract, `@JsonUnwrapped`, `@JsonAnyGetter` and untyped (`Object`) properties are rejected when the schema is derived
 - Spring request-body decoding currently targets `List<T>`
 - Spring response encoding supports `Iterable<T>`, `Stream<T>`, and arrays
-- custom Jackson serializers that fundamentally change a property's JSON shape can make the Java-derived schema inaccurate
+- custom Jackson serializers must describe their JSON shape through `acceptJsonFormatVisitor`, otherwise the schema cannot be derived
 
 ## Build
 
 The project targets Java 21 bytecode. It can be consumed by Java 21, 22, 23, 24, 25 and newer compatible JVMs.
 
 ```bash
-gradle test
+./gradlew build
 ```
 
-The project has been built and tested locally with Gradle 9.7.1 and Java 21.
-No GitHub Actions workflow is currently included.
+The Gradle wrapper pins Gradle 9.3.0. A GitHub Actions workflow runs the build on pushes to `main` and on pull requests.
 
 ## Why not just gzip JSON?
 

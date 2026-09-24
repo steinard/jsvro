@@ -4,10 +4,10 @@ Contributions are welcome.
 
 ## Local checks
 
-Use Java 21 or newer and Gradle 9.7.1 or a compatible Gradle 9.x release:
+Use Java 21 or newer and the Gradle wrapper:
 
 ```bash
-gradle test
+./gradlew build
 ```
 
 Before changing the wire format, update `SPEC.md` and add compatibility tests in `jsvro-core`.

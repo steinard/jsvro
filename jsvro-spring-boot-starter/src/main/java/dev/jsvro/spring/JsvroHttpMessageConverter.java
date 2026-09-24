@@ -11,9 +11,11 @@ import tools.jackson.databind.JavaType;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -37,12 +39,12 @@ public final class JsvroHttpMessageConverter extends AbstractGenericHttpMessageC
 
     @Override
     public boolean canWrite(Type type, Class<?> clazz, MediaType mediaType) {
-        return isJsvro(mediaType) && resolveElementType(type, clazz) != null;
+        return isJsvroOrUnspecified(mediaType) && isEncodable(resolveElementType(type, clazz));
     }
 
     @Override
     public boolean canRead(Type type, Class<?> contextClass, MediaType mediaType) {
-        return isJsvro(mediaType) && isListType(type) && resolveElementType(type, contextClass) != null;
+        return isJsvroOrUnspecified(mediaType) && isListType(type) && isEncodable(resolveElementType(type, contextClass));
     }
 
     @Override
@@ -86,11 +88,18 @@ public final class JsvroHttpMessageConverter extends AbstractGenericHttpMessageC
                 "JSVRO requires a generic target such as List<Person>", inputMessage);
     }
 
+    private boolean isJsvroOrUnspecified(MediaType mediaType) {
+        return mediaType == null || isJsvro(mediaType);
+    }
+
+    private boolean isEncodable(JavaType elementType) {
+        return elementType != null && codec.supports(elementType);
+    }
+
     private boolean isJsvro(MediaType mediaType) {
         // Do not claim */* or application/*: ordinary JSON should remain the default
         // unless the caller explicitly asks for the JSVRO representation.
-        return mediaType != null
-                && !mediaType.isWildcardType()
+        return !mediaType.isWildcardType()
                 && !mediaType.isWildcardSubtype()
                 && JsvroMediaType.APPLICATION_JSVRO.isCompatibleWith(mediaType);
     }
@@ -125,8 +134,8 @@ public final class JsvroHttpMessageConverter extends AbstractGenericHttpMessageC
     }
 
     private Iterable<Object> arrayIterable(Object array) {
-        return () -> new java.util.Iterator<>() {
-            private final int length = java.lang.reflect.Array.getLength(array);
+        return () -> new Iterator<>() {
+            private final int length = Array.getLength(array);
             private int index;
 
             @Override
@@ -136,7 +145,7 @@ public final class JsvroHttpMessageConverter extends AbstractGenericHttpMessageC
 
             @Override
             public Object next() {
-                return java.lang.reflect.Array.get(array, index++);
+                return Array.get(array, index++);
             }
         };
     }
