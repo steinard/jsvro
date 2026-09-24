@@ -1,0 +1,13 @@
+[versions]
+jackson = "3.1.5"
+junit = "6.0.3"
+spring-boot = "4.1.1"
+
+[libraries]
+jackson-databind = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
+spring-boot-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure", version.ref = "spring-boot" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

@@ -3,9 +3,7 @@ package dev.jsvro.core.internal;
 import dev.jsvro.core.JsvroColumn;
 import dev.jsvro.core.JsvroException;
 import tools.jackson.core.JsonGenerator;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.SerializationContext;
 
 import java.lang.reflect.Array;
 
@@ -22,33 +20,27 @@ final class ArrayCodec implements ValueCodec {
     }
 
     @Override
-    public void write(JsonGenerator generator, Object value) {
+    public void write(Object value, JsonGenerator generator, SerializationContext context) {
         if (value == null) {
             generator.writeNull();
             return;
         }
 
         generator.writeStartArray();
-        int length = Array.getLength(value);
-        for (int i = 0; i < length; i++) {
-            itemCodec.write(generator, Array.get(value, i));
+        if (value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            for (int i = 0; i < length; i++) {
+                itemCodec.write(Array.get(value, i), generator, context);
+            }
+        }
+        else if (value instanceof Iterable<?> iterable) {
+            for (Object item : iterable) {
+                itemCodec.write(item, generator, context);
+            }
+        }
+        else {
+            throw new JsvroException("Cannot write " + value.getClass().getName() + " as a JSVRO array");
         }
         generator.writeEndArray();
-    }
-
-    @Override
-    public JsonNode expand(JsonNode positionalValue, ObjectMapper mapper) {
-        if (positionalValue == null || positionalValue.isNull()) {
-            return mapper.nullNode();
-        }
-        if (!positionalValue.isArray()) {
-            throw new JsvroException("Expected positional array value but got " + positionalValue.getNodeType());
-        }
-
-        ArrayNode result = mapper.createArrayNode();
-        for (JsonNode value : positionalValue) {
-            result.add(itemCodec.expand(value, mapper));
-        }
-        return result;
     }
 }
