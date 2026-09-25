@@ -133,6 +133,7 @@ class JsvroBenchmarkTest {
                 "generatedAt", generatedAt,
                 "javaVersion", javaVersion,
                 "cpuCount", cpuCount,
+                "mode", PLAN.mode().name().toLowerCase(),
                 "datasets", datasets.stream()
                         .map(dataset -> Map.of("name", dataset.name(), "description", dataset.description()))
                         .toList(),
@@ -142,6 +143,7 @@ class JsvroBenchmarkTest {
         Path report = Path.of(System.getProperty("jsvro.benchmark.report", "build/reports/jsvro-benchmark/index.html"));
         Files.createDirectories(report.getParent());
         Files.writeString(report, template.replace("/*BENCHMARK_DATA*/null", json));
+        Files.writeString(report.resolveSibling("run-mode.txt"), PLAN.mode().name().toLowerCase());
         Files.writeString(report.resolveSibling("summary.md"),
                 BenchmarkSummary.markdown(results, generatedAt, javaVersion, cpuCount));
         return report.toAbsolutePath();
