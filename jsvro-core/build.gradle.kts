@@ -72,8 +72,14 @@ tasks.register<Test>("benchmark") {
         includeTags("benchmark")
     }
     maxHeapSize = "6g"
-    listOf("plan", "sizes", "rowBudget").forEach { name ->
+    listOf("plan", "full").forEach { name ->
         providers.gradleProperty("benchmark.$name").orNull?.let { systemProperty("jsvro.benchmark.$name", it) }
+    }
+    val runChosen = listOf("plan", "full").any { providers.gradleProperty("benchmark.$it").isPresent }
+    doFirst {
+        if (!runChosen) {
+            throw GradleException("Choose a run: ./benchmark -full, or ./benchmark -ri 10:1000 20:500 for rows:iterations pairs")
+        }
     }
     outputs.upToDateWhen { false }
     testLogging {
@@ -90,6 +96,10 @@ abstract class PublishBenchmarkReport : DefaultTask() {
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val summary: RegularFileProperty
 
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val runMode: RegularFileProperty
+
     @get:OutputFile
     abstract val publishedReport: RegularFileProperty
 
@@ -98,6 +108,11 @@ abstract class PublishBenchmarkReport : DefaultTask() {
 
     @TaskAction
     fun publish() {
+        val mode = runMode.get().asFile.readText().trim()
+        if (mode != "full") {
+            throw GradleException(
+                    "Only a full benchmark run can be published, but the last run was a $mode run. Run ./benchmark -full first.")
+        }
         val target = publishedReport.get().asFile
         target.parentFile.mkdirs()
         report.get().asFile.copyTo(target, overwrite = true)
@@ -119,6 +134,7 @@ tasks.register<PublishBenchmarkReport>("publishBenchmarkReport") {
     group = "documentation"
     report = layout.buildDirectory.file("reports/jsvro-benchmark/index.html")
     summary = layout.buildDirectory.file("reports/jsvro-benchmark/summary.md")
+    runMode = layout.buildDirectory.file("reports/jsvro-benchmark/run-mode.txt")
     publishedReport = rootProject.layout.projectDirectory.file("docs/benchmark/index.html")
     readme = rootProject.layout.projectDirectory.file("README.md")
     outputs.upToDateWhen { false }

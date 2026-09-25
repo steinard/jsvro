@@ -18,6 +18,19 @@ class BenchmarkPlanTest {
         assertEquals(7_000, plan.iterations(50));
         assertEquals(5_000, plan.iterations(100));
         assertEquals(1_000, plan.iterations(1000));
+        assertEquals(BenchmarkPlan.Mode.CUSTOM, plan.mode());
+    }
+
+    @Test
+    void fullPlanCoversFifteenRowCountsFromTenToOneHundredThousand() {
+        BenchmarkPlan plan = BenchmarkPlan.full();
+
+        assertEquals(BenchmarkPlan.Mode.FULL, plan.mode());
+        assertEquals(List.of(10, 20, 30, 40, 50, 100, 500, 1000, 3000, 5000, 10000, 20000, 30000, 50000, 100000),
+                plan.sizes());
+        assertEquals(10_000, plan.iterations(10));
+        assertEquals(6_000, plan.iterations(500));
+        assertEquals(30, plan.iterations(100_000));
     }
 
     @Test

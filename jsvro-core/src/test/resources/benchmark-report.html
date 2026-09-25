@@ -525,7 +525,8 @@ window.addEventListener("resize", () => {
   resizeTimer = setTimeout(renderPage, 150);
 });
 document.getElementById("note").textContent =
-  `Run ${DATA.generatedAt} on Java ${DATA.javaVersion} with ${DATA.cpuCount} CPUs. `
+  (DATA.mode === "custom" ? "Custom run with chosen row counts and iterations. " : "")
+  + `Run ${DATA.generatedAt} on Java ${DATA.javaVersion} with ${DATA.cpuCount} CPUs. `
   + "Time is the median wall-clock time per operation. CPU is the whole process's CPU time per operation, averaged "
   + "over the measured runs, so it includes garbage collection and JIT threads; at the smallest row counts an "
   + "operation takes microseconds and those background threads dominate, so CPU readings there are unreliable. Memory is the median bytes allocated "

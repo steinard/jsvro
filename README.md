@@ -211,17 +211,14 @@ Avro is measured as an object container file without compression, using classes 
 ### Running the benchmark
 
 ```bash
-./gradlew :jsvro-core:benchmark
+./benchmark -full                  # full run: 15 row counts from 10 to 100,000, about 50 minutes
+./benchmark -ri 10:1000 20:500     # custom run: rows:iterations pairs
+./benchmark -publish               # publish the last full run
 ```
 
-Results print to the terminal and are written to `jsvro-core/build/reports/jsvro-benchmark/index.html`. The default run covers 15 row counts from 10 to 100,000 and takes about 50 minutes. To change it:
+A custom run takes any `rows:iterations` pairs, up to 100,000 rows and 10,000 iterations each. The full run uses 10,000 iterations for the smallest row counts and fewer as rows grow. Each measurement runs the same number of warm-up iterations first. Results print to the terminal and are written to `jsvro-core/build/reports/jsvro-benchmark/index.html`. The normal `./gradlew build` does not run the benchmark.
 
-- `-Pbenchmark.plan=10:10000,100:5000,1000:1000` sets the row counts and the exact number of iterations for each.
-- `-Pbenchmark.sizes=100,1000,10000` sets the row counts, and `-Pbenchmark.rowBudget` (default `3000000`) sets the iterations per row count as the budget divided by the row count.
-
-Iterations are capped at 10,000 and row counts at 100,000. Each measurement runs the same number of warm-up iterations first. The normal `./gradlew build` does not run the benchmark.
-
-`./gradlew :jsvro-core:publishBenchmarkReport` copies the last report to `docs/benchmark/index.html`, which GitHub Pages serves, and refreshes the summary tables above.
+Only a full run can be published. `./benchmark -publish` copies the report to `docs/benchmark/index.html`, which GitHub Pages serves, and refreshes the summary tables above; after a custom run it refuses and asks for a full run.
 
 ## Why not just gzip JSON?
 

@@ -9,11 +9,21 @@ final class BenchmarkPlan {
     private static final int MIN_ITERATIONS = 3;
     private static final int MAX_ITERATIONS = 10_000;
     private static final int MAX_ROWS = 100_000;
+    private static final String FULL_SIZES = "10,20,30,40,50,100,500,1000,3000,5000,10000,20000,30000,50000,100000";
+    private static final long FULL_ROW_BUDGET = 3_000_000L;
 
+    enum Mode { FULL, CUSTOM }
+
+    private final Mode mode;
     private final Map<Integer, Integer> iterationsByRows;
 
-    private BenchmarkPlan(Map<Integer, Integer> iterationsByRows) {
+    private BenchmarkPlan(Mode mode, Map<Integer, Integer> iterationsByRows) {
+        this.mode = mode;
         this.iterationsByRows = Map.copyOf(iterationsByRows);
+    }
+
+    static BenchmarkPlan full() {
+        return budgeted(FULL_SIZES, FULL_ROW_BUDGET);
     }
 
     static BenchmarkPlan explicit(String plan) {
@@ -33,7 +43,7 @@ final class BenchmarkPlan {
                 throw new IllegalArgumentException("Rows " + rows + " appear more than once in '" + plan + "'");
             }
         }
-        return new BenchmarkPlan(iterationsByRows);
+        return new BenchmarkPlan(Mode.CUSTOM, iterationsByRows);
     }
 
     static BenchmarkPlan budgeted(String sizes, long rowBudget) {
@@ -43,16 +53,27 @@ final class BenchmarkPlan {
             long iterations = Math.max(MIN_ITERATIONS, Math.min(MAX_ITERATIONS, rowBudget / rows));
             iterationsByRows.put(rows, (int) iterations);
         }
-        return new BenchmarkPlan(iterationsByRows);
+        return new BenchmarkPlan(Mode.FULL, iterationsByRows);
     }
 
     static BenchmarkPlan fromSystemProperties() {
         String plan = System.getProperty("jsvro.benchmark.plan");
+        boolean full = Boolean.getBoolean("jsvro.benchmark.full");
+        if (full && plan != null && !plan.isBlank()) {
+            throw new IllegalArgumentException("Choose either a full run or rows:iterations pairs, not both");
+        }
+        if (full) {
+            return full();
+        }
         if (plan != null && !plan.isBlank()) {
             return explicit(plan);
         }
-        return budgeted(System.getProperty("jsvro.benchmark.sizes", "10,20,30,40,50,100,500,1000,3000,5000,10000,20000,30000,50000,100000"),
-                Long.getLong("jsvro.benchmark.rowBudget", 3_000_000L));
+        throw new IllegalArgumentException(
+                "Choose a run: ./benchmark -full, or ./benchmark -ri 10:1000 20:500 for rows:iterations pairs");
+    }
+
+    Mode mode() {
+        return mode;
     }
 
     List<Integer> sizes() {
@@ -86,6 +107,6 @@ final class BenchmarkPlan {
 
     @Override
     public String toString() {
-        return Arrays.toString(sizes().stream().map(rows -> rows + ":" + iterations(rows)).toArray());
+        return mode + " " + Arrays.toString(sizes().stream().map(rows -> rows + ":" + iterations(rows)).toArray());
     }
 }
