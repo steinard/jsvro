@@ -16,7 +16,7 @@ final class FxTransactions {
     private static final List<String> CURRENCIES = List.of("NOK", "SEK", "DKK", "EUR", "USD", "GBP", "CHF", "JPY");
     private static final List<String> COUNTRIES = List.of("NO", "SE", "DK", "FI", "DE", "GB");
     private static final List<String> PRODUCTS = List.of("ILB", "UTB", "FXS", "CPY", "PAY");
-    private static final List<String> MARKET_PRODUCTS = List.of("SEPA_INSTANT_TO_OTHER_BANK", "INSTANT_INTERNAL", "INSTANT_CARD");
+    private static final List<String> MARKET_PRODUCTS = List.of("SEPA_INSTANT", "INSTANT_INTERNAL", "INSTANT_CARD");
     private static final List<String> SETTLEMENT_SYSTEMS = List.of("NOS", "CLS", "TARGET2", "RIX");
     private static final LocalDate TRADE_DATE = LocalDate.of(2026, 6, 25);
     private static final Instant TRADE_START = Instant.parse("2026-06-25T07:00:00Z");
