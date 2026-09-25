@@ -6,6 +6,8 @@ import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.SerializationContext;
 
 import java.lang.reflect.Array;
+import java.util.List;
+import java.util.Map;
 
 final class ArrayCodec implements ValueCodec {
     private final ValueCodec itemCodec;
@@ -17,6 +19,11 @@ final class ArrayCodec implements ValueCodec {
     @Override
     public JsvroColumn column(String name) {
         return JsvroColumn.array(name, itemCodec.column("item"));
+    }
+
+    @Override
+    public boolean collectObjectTypes(Map<Class<?>, List<String>> columnsByType) {
+        return itemCodec.collectObjectTypes(columnsByType);
     }
 
     @Override

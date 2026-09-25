@@ -23,6 +23,11 @@ public final class NonClosingStreams {
     public static OutputStream output(OutputStream output) {
         return new FilterOutputStream(output) {
             @Override
+            public void write(byte[] bytes, int offset, int length) throws IOException {
+                out.write(bytes, offset, length);
+            }
+
+            @Override
             public void close() throws IOException {
                 flush();
                 // Deliberately do not close the caller-owned stream.

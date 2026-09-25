@@ -64,6 +64,40 @@ class JsvroDecoderTest {
     }
 
     @Test
+    void acceptsHeaderPropertiesInAnyOrderAndIgnoresUnknownOnes() {
+        String header = "{\"columns\":[{\"type\":\"string\",\"note\":{\"a\":[1]},\"name\":\"name\"},"
+                + "{\"name\":\"age\",\"type\":\"integer\"}],\"extra\":[1,2],\"jsvro\":\"1\"}\n";
+
+        assertEquals(List.of(new Person("Alice", 30)), codec.readList(stream(header + "[\"Alice\",30]\n"), Person.class));
+    }
+
+    @Test
+    void rejectsAHeaderWithoutColumns() {
+        assertDecodeFails("{\"jsvro\":\"1\"}\n", "JSVRO schema must contain a columns array");
+    }
+
+    @Test
+    void rejectsAHeaderWithTooFewColumns() {
+        assertDecodeFails("{\"jsvro\":\"1\",\"columns\":[{\"name\":\"name\",\"type\":\"string\"}]}\n",
+                "Schema mismatch at columns: expected 2 columns but got 1");
+    }
+
+    record Owner(String name, List<Pet> pets) {}
+
+    record Pet(String kind) {}
+
+    @Test
+    void reportsNestedSchemaMismatchesWithTheirPath() {
+        String header = "{\"jsvro\":\"1\",\"columns\":[{\"name\":\"name\",\"type\":\"string\"},"
+                + "{\"name\":\"pets\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"columns\":["
+                + "{\"name\":\"species\",\"type\":\"string\"}]}}]}\n";
+
+        var failure = assertThrows(JsvroException.class, () -> codec.readList(stream(header), Owner.class));
+        assertEquals("Schema mismatch at columns[1].items.columns[0].name: expected \"kind\" but got \"species\"",
+                failure.getMessage());
+    }
+
+    @Test
     void readStreamDecodesLazily() {
         String input = HEADER + "[\"Alice\",30]\n[\"broken\"]\n";
 

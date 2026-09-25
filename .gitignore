@@ -8,3 +8,10 @@ build/
 Thumbs.db
 Desktop.ini
 /.idea/
+
+# Eclipse/JDT metadata created by IDE language servers.
+.project
+.classpath
+.settings/
+.factorypath
+bin/

@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JSVRO vs JSON benchmark</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface-1: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --reference: #898781;
+    --border: rgba(11, 11, 11, 0.10);
+    --control: rgba(11, 11, 11, 0.06);
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --series-5: #e87ba4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface-1: #1a1a19;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --reference: #898781;
+      --border: rgba(255, 255, 255, 0.10);
+      --control: rgba(255, 255, 255, 0.08);
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --series-5: #d55181;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --reference: #898781;
+    --border: rgba(255, 255, 255, 0.10);
+    --control: rgba(255, 255, 255, 0.08);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+  }
+
+  body { margin: 0; }
+  .viz-root {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 32px;
+    min-height: 100vh;
+    box-sizing: border-box;
+  }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  .subtitle { color: var(--text-secondary); font-size: 14px; margin: 0 0 16px; max-width: 960px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin: 0 0 8px; font-size: 13px; color: var(--text-secondary); }
+  .filter { display: flex; align-items: center; gap: 10px; }
+  .segmented { display: inline-flex; background: var(--control); border-radius: 8px; padding: 2px; gap: 2px; }
+  .segmented button {
+    font: inherit; font-size: 13px; color: var(--text-secondary); background: transparent;
+    border: 0; border-radius: 6px; padding: 6px 12px; cursor: pointer; white-space: nowrap;
+  }
+  .segmented button[aria-pressed="true"] { background: var(--surface-1); color: var(--text-primary); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+  .segmented button:focus-visible { outline: 2px solid var(--series-1); outline-offset: 1px; }
+  .metric-help { color: var(--text-muted); font-size: 13px; margin: 0 0 8px; }
+  .page > h2 { font-size: 18px; font-weight: 600; margin: 20px 0 2px; }
+  .page > p { font-size: 13px; color: var(--text-secondary); margin: 0 0 12px; max-width: 960px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 16px 8px; min-width: 0; }
+  .card h3 { font-size: 14px; font-weight: 600; margin: 0 0 6px; }
+  .legend { display: flex; flex-direction: column; gap: 3px; margin: 0 0 6px; padding: 0; list-style: none; font-size: 12px; color: var(--text-secondary); }
+  .legend li { display: flex; align-items: center; gap: 6px; }
+  .legend .key { width: 14px; height: 2px; border-radius: 1px; flex: none; }
+  .legend .best { color: var(--text-muted); }
+  svg { display: block; overflow: visible; }
+  svg:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; border-radius: 4px; }
+  .tick { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .axis-title, .reference-label { fill: var(--text-muted); font-size: 11px; }
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 10; display: none;
+    background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    padding: 8px 10px; font-size: 12px; min-width: 240px;
+  }
+  .tooltip .heading { color: var(--text-secondary); margin-bottom: 4px; }
+  .tooltip .row { display: grid; grid-template-columns: 14px 48px auto; align-items: center; column-gap: 6px; margin-top: 4px; }
+  .tooltip .value { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tooltip .name { color: var(--text-secondary); }
+  .tooltip .detail { grid-column: 3; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .tooltip .line-key { width: 12px; height: 2px; border-radius: 1px; }
+  details { margin-top: 16px; }
+  summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+  table { border-collapse: collapse; margin-top: 8px; font-size: 12px; font-variant-numeric: tabular-nums; background: var(--surface-1); }
+  th, td { border-bottom: 1px solid var(--grid); padding: 5px 10px; text-align: right; }
+  th { color: var(--text-secondary); font-weight: 600; }
+  td:nth-child(-n+2), th:nth-child(-n+2) { text-align: left; }
+  .note { font-size: 12px; color: var(--text-muted); margin-top: 28px; max-width: 960px; }
+</style>
+</head>
+<body>
+<div class="viz-root">
+  <h1 id="title"></h1>
+  <p class="subtitle" id="subtitle"></p>
+  <div class="filters">
+    <div class="filter"><span>Compared with</span><div class="segmented" id="baselines" role="group" aria-label="Compared with"></div></div>
+    <div class="filter"><span>View</span><div class="segmented" id="pages" role="group" aria-label="View"></div></div>
+    <div class="filter"><span>Metric</span><div class="segmented" id="metrics" role="group" aria-label="Metric"></div></div>
+  </div>
+  <p class="metric-help" id="metric-help"></p>
+  <div id="page"></div>
+  <p class="note" id="note"></p>
+  <div class="tooltip" id="tooltip" role="status" aria-live="polite"></div>
+</div>
+<script>
+const DATA = /*BENCHMARK_DATA*/null;
+
+const BASELINES = [
+  { key: "json", name: "JSON", title: "JSVRO compared with plain Jackson JSON",
+    subtitle: "Both formats are human-readable text. Wire size, and the time, CPU and memory needed to encode and "
+      + "decode the same rows, for each aggregate root and row count." },
+  { key: "avro", name: "Avro", title: "JSVRO compared with Avro",
+    subtitle: "Avro is binary and not human-readable; JSVRO stays readable JSON. This shows what that readability "
+      + "costs, for the same rows, aggregate roots and row counts." },
+];
+let activeBaseline = BASELINES[0];
+
+const METRICS = [
+  { key: "saved", label: "Saved", help: b => `Saved = 1 − JSVRO ÷ ${b}. Above zero favours JSVRO.`,
+    fromRatio: r => 100 * (1 - r), format: v => (v > 0 ? "+" : "") + v.toFixed(0) + "%",
+    tick: v => +v.toFixed(1) + "%", parity: 0, higherIsBetter: true },
+  { key: "takes", label: "JSVRO takes", help: b => `JSVRO takes = JSVRO ÷ ${b}. Below the ${b} line favours JSVRO.`,
+    fromRatio: r => 100 * r, format: v => v.toFixed(0) + "%",
+    tick: v => +v.toFixed(1) + "%", parity: 100, higherIsBetter: false },
+  { key: "throughput", label: "Throughput", help: b => `Throughput = ${b} ÷ JSVRO, rows handled per unit of the resource. Above the ${b} line favours JSVRO.`,
+    fromRatio: r => 1 / r, format: v => v.toFixed(2) + "×",
+    tick: v => +v.toFixed(2) + "×", parity: 1, higherIsBetter: true },
+];
+
+const DIMENSIONS = {
+  size: { label: "Raw size", series: "--series-4", unit: "bytes" },
+  gzip: { label: "Gzip size", series: "--series-5", unit: "bytes" },
+  time: { label: "Time", series: "--series-1", unit: "nanos" },
+  cpu: { label: "CPU", series: "--series-2", unit: "nanos" },
+  memory: { label: "Memory allocated", series: "--series-3", unit: "bytes" },
+};
+
+const OPERATIONS = [
+  { key: "size", title: "Wire size", dimensions: ["size", "gzip"] },
+  { key: "encode", title: "Encode", dimensions: ["time", "cpu", "memory"] },
+  { key: "decode", title: "Decode", dimensions: ["time", "cpu", "memory"] },
+];
+
+const SERIES = OPERATIONS.flatMap(operation => operation.dimensions.map(dimension => ({ operation, dimension,
+  label: operation.key === "size" ? DIMENSIONS[dimension].label : `${operation.title} ${DIMENSIONS[dimension].label.toLowerCase()}` })));
+
+function amounts(row, operation, dimension) {
+  const field = { time: "wallNanos", cpu: "cpuNanos", memory: "allocatedBytes" }[dimension];
+  const pick = format => operation === "size"
+    ? (dimension === "size" ? format.bytes : format.gzipBytes)
+    : format[operation][field];
+  return { base: pick(row.formats[activeBaseline.key]), jsvro: pick(row.formats.jsvro) };
+}
+
+const SVG = "http://www.w3.org/2000/svg";
+const rowsLabel = n => n >= 1e3 ? (n / 1e3) + "k" : String(n);
+function formatAmount(value, unit) {
+  if (unit === "nanos") return (value / 1e6).toLocaleString("en-US", { maximumFractionDigits: 3 }) + " ms";
+  if (value >= 1e6) return (value / 1e6).toLocaleString("en-US", { maximumFractionDigits: 1 }) + " MB";
+  if (value >= 1e3) return (value / 1e3).toLocaleString("en-US", { maximumFractionDigits: 1 }) + " KB";
+  return value.toLocaleString("en-US") + " B";
+}
+
+function el(name, attributes = {}, parent) {
+  const node = document.createElementNS(SVG, name);
+  for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+  if (parent) parent.appendChild(node);
+  return node;
+}
+
+function buildRoots() {
+  const described = new Map((DATA.datasets ?? []).map(dataset => [dataset.name, dataset.description]));
+  const byName = new Map();
+  for (const row of DATA.results) {
+    if (!byName.has(row.dataset)) byName.set(row.dataset, []);
+    byName.get(row.dataset).push(row);
+  }
+  return [...byName].map(([name, rows]) => ({
+    name,
+    description: described.get(name) ?? "",
+    points: rows.sort((a, b) => a.rows - b.rows).map(row => ({
+      rows: row.rows,
+      iterations: row.iterations,
+      ratio: (operation, dimension) => {
+        const { base, jsvro } = amounts(row, operation, dimension);
+        return jsvro / base;
+      },
+      detail: (operation, dimension) => {
+        const { base, jsvro } = amounts(row, operation, dimension);
+        const unit = DIMENSIONS[dimension].unit;
+        return `${activeBaseline.name} ${formatAmount(base, unit)} → JSVRO ${formatAmount(jsvro, unit)}`;
+      },
+      amounts: (operation, dimension) => amounts(row, operation, dimension),
+    })),
+  }));
+}
+
+function buildSummary(roots) {
+  const shared = roots.reduce((counts, root) => counts.filter(n => root.points.some(p => p.rows === n)),
+    roots[0].points.map(p => p.rows));
+  const at = (root, n) => root.points.find(p => p.rows === n);
+  return {
+    name: "Summary",
+    get description() {
+      return `All ${roots.length} aggregate roots combined at each row count: the geometric mean of their JSVRO ÷ `
+        + `${activeBaseline.name} ratios, so each root counts equally regardless of how big its rows are.`;
+    },
+    points: shared.map(n => ({
+      rows: n,
+      perRoot: roots.map(root => ({ name: root.name, point: at(root, n) })),
+      ratio: (operation, dimension) =>
+        Math.exp(roots.reduce((sum, root) => sum + Math.log(at(root, n).ratio(operation, dimension)), 0) / roots.length),
+      detail: (operation, dimension) => roots.map(root =>
+        `${root.name} ${activeMetric.format(activeMetric.fromRatio(at(root, n).ratio(operation, dimension)))}`).join(" · "),
+    })),
+  };
+}
+
+function niceStep(range, maxTicks) {
+  const raw = range / maxTicks;
+  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  return [1, 2, 2.5, 5, 10].map(factor => factor * magnitude).find(step => step >= raw);
+}
+
+function domainFor(values) {
+  const low = Math.min(activeMetric.parity, ...values);
+  const high = Math.max(activeMetric.parity, ...values);
+  const step = niceStep(Math.max(high - low, activeMetric.parity === 1 ? 0.05 : 5), 4);
+  return { min: Math.floor(low / step) * step, max: Math.ceil(high / step) * step, step };
+}
+
+const tooltip = document.getElementById("tooltip");
+
+function showTooltip(anchor, view, operation, point) {
+  tooltip.replaceChildren();
+  const heading = document.createElement("div");
+  heading.className = "heading";
+  heading.textContent = `${view.name} · ${operation.title} · ${point.rows.toLocaleString("en-US")} rows`;
+  tooltip.appendChild(heading);
+  for (const dimension of operation.dimensions) {
+    const line = document.createElement("div");
+    line.className = "row";
+    const key = document.createElement("span");
+    key.className = "line-key";
+    key.style.background = `var(${DIMENSIONS[dimension].series})`;
+    const value = document.createElement("span");
+    value.className = "value";
+    value.textContent = activeMetric.format(activeMetric.fromRatio(point.ratio(operation.key, dimension)));
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = DIMENSIONS[dimension].label;
+    const detail = document.createElement("span");
+    detail.className = "detail";
+    detail.textContent = point.detail(operation.key, dimension);
+    line.append(key, value, name, detail);
+    tooltip.appendChild(line);
+  }
+  tooltip.style.display = "block";
+  const box = tooltip.getBoundingClientRect();
+  const left = anchor.x + 16 + box.width > window.innerWidth ? anchor.x - box.width - 16 : anchor.x + 16;
+  tooltip.style.left = Math.max(8, left) + "px";
+  tooltip.style.top = Math.max(8, Math.min(window.innerHeight - box.height - 8, anchor.y - box.height / 2)) + "px";
+}
+
+const hideTooltip = () => { tooltip.style.display = "none"; };
+
+function bestPoint(points, operation, dimension) {
+  return points.reduce((best, point) => {
+    const value = activeMetric.fromRatio(point.ratio(operation.key, dimension));
+    const bestValue = activeMetric.fromRatio(best.ratio(operation.key, dimension));
+    return (activeMetric.higherIsBetter ? value > bestValue : value < bestValue) ? point : best;
+  });
+}
+
+function renderChart(container, view, operation, domain) {
+  const points = view.points;
+  const height = 220;
+  const margin = { top: 12, right: 44, bottom: 42, left: 52 };
+
+  const card = document.createElement("section");
+  card.className = "card";
+  const title = document.createElement("h3");
+  title.textContent = operation.title;
+  const legend = document.createElement("ul");
+  legend.className = "legend";
+  for (const dimension of operation.dimensions) {
+    const best = bestPoint(points, operation, dimension);
+    const item = document.createElement("li");
+    const key = document.createElement("span");
+    key.className = "key";
+    key.style.background = `var(${DIMENSIONS[dimension].series})`;
+    const label = document.createElement("span");
+    label.textContent = DIMENSIONS[dimension].label;
+    const note = document.createElement("span");
+    note.className = "best";
+    note.textContent = `· best ${activeMetric.format(activeMetric.fromRatio(best.ratio(operation.key, dimension)))} at ${rowsLabel(best.rows)}`;
+    item.append(key, label, note);
+    legend.appendChild(item);
+  }
+  card.append(title, legend);
+  container.appendChild(card);
+  return () => drawChart(card, view, operation, domain);
+}
+
+function drawChart(card, view, operation, domain) {
+  const points = view.points;
+  const height = 220;
+  const margin = { top: 12, right: 44, bottom: 42, left: 52 };
+  const width = Math.max(260, card.clientWidth - 32);
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const logMin = Math.log10(points[0].rows);
+  const logMax = Math.log10(points[points.length - 1].rows);
+  const x = n => margin.left + (logMax === logMin ? plotWidth / 2 : (Math.log10(n) - logMin) / (logMax - logMin) * plotWidth);
+  const y = v => margin.top + (domain.max - v) / (domain.max - domain.min) * plotHeight;
+
+  const svg = el("svg", { width, height, viewBox: `0 0 ${width} ${height}`, tabindex: 0, role: "img",
+    "aria-label": `${view.name}, ${operation.title}: ${metricLabel(activeMetric)} by rows per stream. `
+      + "Use the left and right arrow keys to read each row count." }, card);
+
+  for (let tick = domain.min; tick <= domain.max + domain.step / 1e6; tick += domain.step) {
+    el("line", { x1: margin.left, x2: width - margin.right, y1: y(tick), y2: y(tick), stroke: "var(--grid)", "stroke-width": 1 }, svg);
+    el("text", { x: margin.left - 8, y: y(tick) + 4, "text-anchor": "end", class: "tick" }, svg).textContent = activeMetric.tick(tick);
+  }
+  for (let decade = 10 ** Math.ceil(logMin); decade <= points[points.length - 1].rows; decade *= 10) {
+    el("text", { x: x(decade), y: height - margin.bottom + 18, "text-anchor": "middle", class: "tick" }, svg).textContent = rowsLabel(decade);
+  }
+  el("text", { x: margin.left + plotWidth / 2, y: height - 4, "text-anchor": "middle", class: "axis-title" }, svg)
+    .textContent = "Rows per stream (log scale)";
+
+  el("line", { x1: margin.left, x2: width - margin.right, y1: y(activeMetric.parity), y2: y(activeMetric.parity),
+    stroke: "var(--reference)", "stroke-width": 1 }, svg);
+  el("text", { x: width - margin.right + 6, y: y(activeMetric.parity) + 4, class: "reference-label" }, svg).textContent = activeBaseline.name;
+
+  const crosshair = el("line", { y1: margin.top, y2: margin.top + plotHeight, stroke: "var(--baseline)",
+    "stroke-width": 1, visibility: "hidden" }, svg);
+
+  for (const dimension of operation.dimensions) {
+    const coordinates = points.map(point =>
+      [x(point.rows), y(activeMetric.fromRatio(point.ratio(operation.key, dimension)))]);
+    el("path", { d: coordinates.map((c, index) => (index ? "L" : "M") + c.join(",")).join(""),
+      fill: "none", stroke: `var(${DIMENSIONS[dimension].series})`, "stroke-width": 2,
+      "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    for (const [cx, cy] of coordinates) {
+      el("circle", { cx, cy, r: 4, fill: `var(${DIMENSIONS[dimension].series})`, stroke: "var(--surface-1)", "stroke-width": 2 }, svg);
+    }
+  }
+
+  let active = -1;
+  function select(index) {
+    active = index;
+    const px = x(points[index].rows);
+    crosshair.setAttribute("x1", px);
+    crosshair.setAttribute("x2", px);
+    crosshair.setAttribute("visibility", "visible");
+    const box = svg.getBoundingClientRect();
+    showTooltip({ x: box.left + px, y: box.top + margin.top + plotHeight / 2 }, view, operation, points[index]);
+  }
+  function clear() {
+    active = -1;
+    crosshair.setAttribute("visibility", "hidden");
+    hideTooltip();
+  }
+  const hit = el("rect", { x: margin.left - 12, y: margin.top, width: plotWidth + 24, height: plotHeight, fill: "transparent" }, svg);
+  hit.addEventListener("pointermove", event => {
+    const px = event.clientX - svg.getBoundingClientRect().left;
+    let nearest = 0;
+    points.forEach((point, index) => {
+      if (Math.abs(x(point.rows) - px) < Math.abs(x(points[nearest].rows) - px)) nearest = index;
+    });
+    if (nearest !== active) select(nearest);
+  });
+  hit.addEventListener("pointerleave", clear);
+  svg.addEventListener("keydown", event => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const step = event.key === "ArrowRight" ? 1 : -1;
+    const start = active < 0 ? (step > 0 ? -1 : points.length) : active;
+    select(Math.min(points.length - 1, Math.max(0, start + step)));
+  });
+  svg.addEventListener("blur", clear);
+}
+
+function table(headings, rows) {
+  const node = document.createElement("table");
+  const head = node.createTHead().insertRow();
+  for (const heading of headings) {
+    const cell = document.createElement("th");
+    cell.textContent = heading;
+    head.appendChild(cell);
+  }
+  const body = node.createTBody();
+  for (const values of rows) {
+    const tr = body.insertRow();
+    for (const value of values) tr.insertCell().textContent = value;
+  }
+  return node;
+}
+
+function rootTable(view) {
+  return table(["Rows", "Dimension", "Iterations", activeBaseline.name, "JSVRO", ...METRICS.map(metricLabel)],
+    view.points.flatMap(point => SERIES.map(({ operation, dimension, label }) => {
+      const { base, jsvro } = point.amounts(operation.key, dimension);
+      const unit = DIMENSIONS[dimension].unit;
+      return [point.rows.toLocaleString("en-US"), label, point.iterations.toLocaleString("en-US"),
+        formatAmount(base, unit), formatAmount(jsvro, unit), ...METRICS.map(m => m.format(m.fromRatio(jsvro / base)))];
+    })));
+}
+
+function summaryTable(view) {
+  const names = view.points[0].perRoot.map(entry => entry.name);
+  return table(["Rows", "Dimension", ...names, "Combined"],
+    view.points.flatMap(point => SERIES.map(({ operation, dimension, label }) => [
+      point.rows.toLocaleString("en-US"), label,
+      ...point.perRoot.map(entry => activeMetric.format(activeMetric.fromRatio(entry.point.ratio(operation.key, dimension)))),
+      activeMetric.format(activeMetric.fromRatio(point.ratio(operation.key, dimension)))])));
+}
+
+const ROOTS = buildRoots();
+const SUMMARY = buildSummary(ROOTS);
+const VIEWS = [SUMMARY, ...ROOTS];
+let activeView = SUMMARY;
+let activeMetric = METRICS[0];
+let tableOpen = false;
+
+function renderPage() {
+  const container = document.getElementById("page");
+  const open = container.querySelector("details");
+  if (open) tableOpen = open.open;
+  container.replaceChildren();
+  document.getElementById("title").textContent = activeBaseline.title;
+  document.title = activeBaseline.title;
+  document.getElementById("subtitle").textContent = activeBaseline.subtitle;
+  document.getElementById("metric-help").textContent = activeMetric.help(activeBaseline.name);
+  document.querySelectorAll("#metrics button").forEach((button, index) => {
+    button.textContent = metricLabel(METRICS[index]);
+  });
+
+  const page = document.createElement("section");
+  page.className = "page";
+  const heading = document.createElement("h2");
+  heading.textContent = activeView.name;
+  const description = document.createElement("p");
+  description.textContent = activeView.description;
+  const grid = document.createElement("div");
+  grid.className = "grid";
+  page.append(heading, description, grid);
+  container.appendChild(page);
+
+  const draws = OPERATIONS.map(operation => {
+    const values = VIEWS.flatMap(view => view.points.flatMap(point =>
+      operation.dimensions.map(dimension => activeMetric.fromRatio(point.ratio(operation.key, dimension)))));
+    return renderChart(grid, activeView, operation, domainFor(values));
+  });
+  draws.forEach(draw => draw());
+
+  const details = document.createElement("details");
+  details.open = tableOpen;
+  const summary = document.createElement("summary");
+  summary.textContent = activeView === SUMMARY
+    ? `Table view (${metricLabel(activeMetric).toLowerCase()} per aggregate root and combined)`
+    : "Table view";
+  details.append(summary, activeView === SUMMARY ? summaryTable(activeView) : rootTable(activeView));
+  page.appendChild(details);
+}
+
+function metricLabel(metric) {
+  return metric.key === "throughput" ? `Throughput vs ${activeBaseline.name}` : metric.label;
+}
+
+function segmented(containerId, options, isActive, onSelect) {
+  const group = document.getElementById(containerId);
+  const buttons = options.map(option => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = option.label ?? option.name;
+    button.setAttribute("aria-pressed", String(isActive(option)));
+    button.addEventListener("click", () => {
+      buttons.forEach(other => other.setAttribute("aria-pressed", String(other === button)));
+      onSelect(option);
+      renderPage();
+    });
+    group.appendChild(button);
+    return button;
+  });
+}
+
+segmented("baselines", BASELINES, baseline => baseline === activeBaseline, baseline => { activeBaseline = baseline; });
+segmented("pages", VIEWS, view => view === activeView, view => { activeView = view; });
+segmented("metrics", METRICS, metric => metric === activeMetric, metric => { activeMetric = metric; });
+renderPage();
+let resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(renderPage, 150);
+});
+document.getElementById("note").textContent =
+  `Run ${DATA.generatedAt} on Java ${DATA.javaVersion} with ${DATA.cpuCount} CPUs. `
+  + "Time is the median wall-clock time per operation. CPU is the whole process's CPU time per operation, averaged "
+  + "over the measured runs, so it includes garbage collection and JIT threads; at the smallest row counts an "
+  + "operation takes microseconds and those background threads dominate, so CPU readings there are unreliable. Memory is the median bytes allocated "
+  + "per operation on the benchmark thread; encoding writes to a counting stream so output buffers are not counted. "
+  + "Avro is measured as an object container file without compression, using classes generated from Avro schemas; "
+  + "mapping between the benchmark objects and the generated classes is included in encode and decode, as it would be "
+  + "in an application. Chart scales are shared between the summary and every aggregate root, per chart type and "
+  + "baseline.";
+</script>
+</body>
+</html>

@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JSVRO vs JSON benchmark</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface-1: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --reference: #898781;
+    --border: rgba(11, 11, 11, 0.10);
+    --control: rgba(11, 11, 11, 0.06);
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --series-5: #e87ba4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface-1: #1a1a19;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --reference: #898781;
+      --border: rgba(255, 255, 255, 0.10);
+      --control: rgba(255, 255, 255, 0.08);
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --series-5: #d55181;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --reference: #898781;
+    --border: rgba(255, 255, 255, 0.10);
+    --control: rgba(255, 255, 255, 0.08);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+  }
+
+  body { margin: 0; }
+  .viz-root {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 32px;
+    min-height: 100vh;
+    box-sizing: border-box;
+  }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  .subtitle { color: var(--text-secondary); font-size: 14px; margin: 0 0 16px; max-width: 960px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin: 0 0 8px; font-size: 13px; color: var(--text-secondary); }
+  .filter { display: flex; align-items: center; gap: 10px; }
+  .segmented { display: inline-flex; background: var(--control); border-radius: 8px; padding: 2px; gap: 2px; }
+  .segmented button {
+    font: inherit; font-size: 13px; color: var(--text-secondary); background: transparent;
+    border: 0; border-radius: 6px; padding: 6px 12px; cursor: pointer; white-space: nowrap;
+  }
+  .segmented button[aria-pressed="true"] { background: var(--surface-1); color: var(--text-primary); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+  .segmented button:focus-visible { outline: 2px solid var(--series-1); outline-offset: 1px; }
+  .metric-help { color: var(--text-muted); font-size: 13px; margin: 0 0 8px; }
+  .page > h2 { font-size: 18px; font-weight: 600; margin: 20px 0 2px; }
+  .page > p { font-size: 13px; color: var(--text-secondary); margin: 0 0 12px; max-width: 960px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 16px 8px; min-width: 0; }
+  .card h3 { font-size: 14px; font-weight: 600; margin: 0 0 6px; }
+  .legend { display: flex; flex-direction: column; gap: 3px; margin: 0 0 6px; padding: 0; list-style: none; font-size: 12px; color: var(--text-secondary); }
+  .legend li { display: flex; align-items: center; gap: 6px; }
+  .legend .key { width: 14px; height: 2px; border-radius: 1px; flex: none; }
+  .legend .best { color: var(--text-muted); }
+  svg { display: block; overflow: visible; }
+  svg:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; border-radius: 4px; }
+  .tick { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .axis-title, .reference-label { fill: var(--text-muted); font-size: 11px; }
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 10; display: none;
+    background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    padding: 8px 10px; font-size: 12px; min-width: 240px;
+  }
+  .tooltip .heading { color: var(--text-secondary); margin-bottom: 4px; }
+  .tooltip .row { display: grid; grid-template-columns: 14px 48px auto; align-items: center; column-gap: 6px; margin-top: 4px; }
+  .tooltip .value { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tooltip .name { color: var(--text-secondary); }
+  .tooltip .detail { grid-column: 3; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .tooltip .line-key { width: 12px; height: 2px; border-radius: 1px; }
+  details { margin-top: 16px; }
+  summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+  table { border-collapse: collapse; margin-top: 8px; font-size: 12px; font-variant-numeric: tabular-nums; background: var(--surface-1); }
+  th, td { border-bottom: 1px solid var(--grid); padding: 5px 10px; text-align: right; }
+  th { color: var(--text-secondary); font-weight: 600; }
+  td:nth-child(-n+2), th:nth-child(-n+2) { text-align: left; }
+  .note { font-size: 12px; color: var(--text-muted); margin-top: 28px; max-width: 960px; }
+</style>
+</head>
+<body>
+<div class="viz-root">
+  <h1 id="title"></h1>
+  <p class="subtitle" id="subtitle"></p>
+  <div class="filters">
+    <div class="filter"><span>Compared with</span><div class="segmented" id="baselines" role="group" aria-label="Compared with"></div></div>
+    <div class="filter"><span>View</span><div class="segmented" id="pages" role="group" aria-label="View"></div></div>
+    <div class="filter"><span>Metric</span><div class="segmented" id="metrics" role="group" aria-label="Metric"></div></div>
+  </div>
+  <p class="metric-help" id="metric-help"></p>
+  <div id="page"></div>
+  <p class="note" id="note"></p>
+  <div class="tooltip" id="tooltip" role="status" aria-live="polite"></div>
+</div>
+<script>
+const DATA = {"results":[{"dataset":"Person","rows":10,"iterations":10000,"formats":{"json":{"bytes":6387,"gzipBytes":1772,"encode":{"wallNanos":20459,"cpuNanos":24480,"allocatedBytes":29456},"decode":{"wallNanos":20750,"cpuNanos":30389,"allocatedBytes":30456}},"jsvro":{"bytes":4428,"gzipBytes":1763,"encode":{"wallNanos":17291,"cpuNanos":17899,"allocatedBytes":29448},"decode":{"wallNanos":19083,"cpuNanos":20301,"allocatedBytes":30696}},"avro":{"bytes":3924,"gzipBytes":2527,"encode":{"wallNanos":13834,"cpuNanos":29586,"allocatedBytes":107392},"decode":{"wallNanos":38083,"cpuNanos":85738,"allocatedBytes":93760}}}},{"dataset":"Person","rows":20,"iterations":10000,"formats":{"json":{"bytes":12212,"gzipBytes":3172,"encode":{"wallNanos":36833,"cpuNanos":37160,"allocatedBytes":54872},"decode":{"wallNanos":41625,"cpuNanos":43330,"allocatedBytes":58080}},"jsvro":{"bytes":7819,"gzipBytes":3066,"encode":{"wallNanos":32916,"cpuNanos":33551,"allocatedBytes":54864},"decode":{"wallNanos":33917,"cpuNanos":34308,"allocatedBytes":52400}},"avro":{"bytes":6313,"gzipBytes":4304,"encode":{"wallNanos":19167,"cpuNanos":20067,"allocatedBytes":118296},"decode":{"wallNanos":26875,"cpuNanos":39623,"allocatedBytes":122600}}}},{"dataset":"Person","rows":30,"iterations":10000,"formats":{"json":{"bytes":18079,"gzipBytes":4519,"encode":{"wallNanos":55750,"cpuNanos":55560,"allocatedBytes":80192},"decode":{"wallNanos":63375,"cpuNanos":65478,"allocatedBytes":85872}},"jsvro":{"bytes":11252,"gzipBytes":4322,"encode":{"wallNanos":49000,"cpuNanos":49452,"allocatedBytes":80184},"decode":{"wallNanos":50292,"cpuNanos":50980,"allocatedBytes":74272}},"avro":{"bytes":8744,"gzipBytes":6064,"encode":{"wallNanos":26958,"cpuNanos":27796,"allocatedBytes":129296},"decode":{"wallNanos":33334,"cpuNanos":51103,"allocatedBytes":151712}}}},{"dataset":"Person","rows":40,"iterations":10000,"formats":{"json":{"bytes":24055,"gzipBytes":5921,"encode":{"wallNanos":73250,"cpuNanos":73989,"allocatedBytes":106112},"decode":{"wallNanos":84458,"cpuNanos":86795,"allocatedBytes":114368}},"jsvro":{"bytes":14770,"gzipBytes":5609,"encode":{"wallNanos":65041,"cpuNanos":65577,"allocatedBytes":106104},"decode":{"wallNanos":65792,"cpuNanos":66395,"allocatedBytes":96848}},"avro":{"bytes":11233,"gzipBytes":7838,"encode":{"wallNanos":34209,"cpuNanos":34767,"allocatedBytes":140384},"decode":{"wallNanos":39583,"cpuNanos":45865,"allocatedBytes":182088}}}},{"dataset":"Person","rows":50,"iterations":10000,"formats":{"json":{"bytes":30561,"gzipBytes":7508,"encode":{"wallNanos":95167,"cpuNanos":96451,"allocatedBytes":136344},"decode":{"wallNanos":105625,"cpuNanos":106729,"allocatedBytes":143984}},"jsvro":{"bytes":18602,"gzipBytes":7091,"encode":{"wallNanos":84000,"cpuNanos":85586,"allocatedBytes":136336},"decode":{"wallNanos":81459,"cpuNanos":81987,"allocatedBytes":120544}},"avro":{"bytes":13941,"gzipBytes":9867,"encode":{"wallNanos":42958,"cpuNanos":43773,"allocatedBytes":153328},"decode":{"wallNanos":47084,"cpuNanos":52481,"allocatedBytes":214392}}}},{"dataset":"Person","rows":100,"iterations":10000,"formats":{"json":{"bytes":60478,"gzipBytes":14358,"encode":{"wallNanos":190959,"cpuNanos":199877,"allocatedBytes":267976},"decode":{"wallNanos":211542,"cpuNanos":218010,"allocatedBytes":284296}},"jsvro":{"bytes":36085,"gzipBytes":13515,"encode":{"wallNanos":164458,"cpuNanos":166551,"allocatedBytes":267968},"decode":{"wallNanos":159541,"cpuNanos":161349,"allocatedBytes":231256}},"avro":{"bytes":26361,"gzipBytes":18553,"encode":{"wallNanos":80708,"cpuNanos":82741,"allocatedBytes":209632},"decode":{"wallNanos":77916,"cpuNanos":87404,"allocatedBytes":361576}}}},{"dataset":"Person","rows":500,"iterations":6000,"formats":{"json":{"bytes":293612,"gzipBytes":66902,"encode":{"wallNanos":894750,"cpuNanos":880506,"allocatedBytes":1274400},"decode":{"wallNanos":1030542,"cpuNanos":1056193,"allocatedBytes":1397352}},"jsvro":{"bytes":172147,"gzipBytes":62028,"encode":{"wallNanos":793250,"cpuNanos":817095,"allocatedBytes":1274392},"decode":{"wallNanos":761792,"cpuNanos":805662,"allocatedBytes":1107512}},"avro":{"bytes":122891,"gzipBytes":83166,"encode":{"wallNanos":388333,"cpuNanos":396668,"allocatedBytes":645808},"decode":{"wallNanos":319625,"cpuNanos":343449,"allocatedBytes":1483896}}}},{"dataset":"Person","rows":1000,"iterations":3000,"formats":{"json":{"bytes":584961,"gzipBytes":132248,"encode":{"wallNanos":1784291,"cpuNanos":1841704,"allocatedBytes":2532848},"decode":{"wallNanos":2007709,"cpuNanos":2139540,"allocatedBytes":2790568}},"jsvro":{"bytes":342060,"gzipBytes":122313,"encode":{"wallNanos":1528708,"cpuNanos":1618965,"allocatedBytes":2532896},"decode":{"wallNanos":1483417,"cpuNanos":1572444,"allocatedBytes":2204728}},"avro":{"bytes":243612,"gzipBytes":163941,"encode":{"wallNanos":758333,"cpuNanos":802090,"allocatedBytes":1196016},"decode":{"wallNanos":613250,"cpuNanos":656174,"allocatedBytes":2906696}}}},{"dataset":"Person","rows":3000,"iterations":1000,"formats":{"json":{"bytes":1747982,"gzipBytes":393293,"encode":{"wallNanos":5224375,"cpuNanos":5386299,"allocatedBytes":7546056},"decode":{"wallNanos":5984291,"cpuNanos":6354148,"allocatedBytes":8360936}},"jsvro":{"bytes":1020525,"gzipBytes":362820,"encode":{"wallNanos":4481583,"cpuNanos":4679532,"allocatedBytes":7546048},"decode":{"wallNanos":4441417,"cpuNanos":4728258,"allocatedBytes":6591096}},"avro":{"bytes":725356,"gzipBytes":485912,"encode":{"wallNanos":2269583,"cpuNanos":2393236,"allocatedBytes":3379384},"decode":{"wallNanos":1805875,"cpuNanos":1933872,"allocatedBytes":8330840}}}},{"dataset":"Person","rows":5000,"iterations":600,"formats":{"json":{"bytes":2894526,"gzipBytes":649511,"encode":{"wallNanos":8249625,"cpuNanos":8545473,"allocatedBytes":12439864},"decode":{"wallNanos":10017833,"cpuNanos":10662775,"allocatedBytes":13879080}},"jsvro":{"bytes":1688621,"gzipBytes":598918,"encode":{"wallNanos":7242250,"cpuNanos":7540068,"allocatedBytes":12439856},"decode":{"wallNanos":7356916,"cpuNanos":7731320,"allocatedBytes":10925240}},"avro":{"bytes":1199363,"gzipBytes":800763,"encode":{"wallNanos":3708500,"cpuNanos":3903281,"allocatedBytes":5523040},"decode":{"wallNanos":2980500,"cpuNanos":3190768,"allocatedBytes":13766472}}}},{"dataset":"Person","rows":10000,"iterations":300,"formats":{"json":{"bytes":5799460,"gzipBytes":1301319,"encode":{"wallNanos":16048416,"cpuNanos":16638163,"allocatedBytes":24950592},"decode":{"wallNanos":20107708,"cpuNanos":21514433,"allocatedBytes":27811704}},"jsvro":{"bytes":3383287,"gzipBytes":1199424,"encode":{"wallNanos":13965416,"cpuNanos":14696253,"allocatedBytes":24950584},"decode":{"wallNanos":14528250,"cpuNanos":15616560,"allocatedBytes":21897864}},"avro":{"bytes":2402945,"gzipBytes":1603905,"encode":{"wallNanos":7655000,"cpuNanos":7988916,"allocatedBytes":10979552},"decode":{"wallNanos":5959625,"cpuNanos":6417500,"allocatedBytes":27433448}}}},{"dataset":"Person","rows":20000,"iterations":150,"formats":{"json":{"bytes":11610649,"gzipBytes":2605363,"encode":{"wallNanos":30393875,"cpuNanos":31815366,"allocatedBytes":49975920},"decode":{"wallNanos":39767792,"cpuNanos":41748360,"allocatedBytes":55574896}},"jsvro":{"bytes":6773604,"gzipBytes":2401175,"encode":{"wallNanos":28997125,"cpuNanos":30101466,"allocatedBytes":49975912},"decode":{"wallNanos":28698209,"cpuNanos":30548133,"allocatedBytes":43741056}},"avro":{"bytes":4810916,"gzipBytes":3210911,"encode":{"wallNanos":14891042,"cpuNanos":15091373,"allocatedBytes":21893976},"decode":{"wallNanos":11915000,"cpuNanos":12529786,"allocatedBytes":54520360}}}},{"dataset":"Person","rows":30000,"iterations":100,"formats":{"json":{"bytes":17379813,"gzipBytes":3896556,"encode":{"wallNanos":42685834,"cpuNanos":43560490,"allocatedBytes":74701520},"decode":{"wallNanos":60947792,"cpuNanos":66099900,"allocatedBytes":83266608}},"jsvro":{"bytes":10137496,"gzipBytes":3591488,"encode":{"wallNanos":42642250,"cpuNanos":42982810,"allocatedBytes":74701512},"decode":{"wallNanos":42978583,"cpuNanos":46614880,"allocatedBytes":65512768}},"avro":{"bytes":7198477,"gzipBytes":4799901,"encode":{"wallNanos":22924959,"cpuNanos":23743160,"allocatedBytes":32680840},"decode":{"wallNanos":17988250,"cpuNanos":20289200,"allocatedBytes":81491592}}}},{"dataset":"Person","rows":50000,"iterations":60,"formats":{"json":{"bytes":28927155,"gzipBytes":6480787,"encode":{"wallNanos":73024208,"cpuNanos":73263700,"allocatedBytes":124208528},"decode":{"wallNanos":102563792,"cpuNanos":106134900,"allocatedBytes":138890632}},"jsvro":{"bytes":16870958,"gzipBytes":5972298,"encode":{"wallNanos":67408875,"cpuNanos":69642950,"allocatedBytes":124208520},"decode":{"wallNanos":72234417,"cpuNanos":76077916,"allocatedBytes":109296792}},"avro":{"bytes":11979018,"gzipBytes":7979482,"encode":{"wallNanos":39062375,"cpuNanos":39334516,"allocatedBytes":54297920},"decode":{"wallNanos":30054583,"cpuNanos":35054400,"allocatedBytes":135710000}}}},{"dataset":"Person","rows":100000,"iterations":30,"formats":{"json":{"bytes":57818800,"gzipBytes":12950529,"encode":{"wallNanos":145711083,"cpuNanos":148225600,"allocatedBytes":248160392},"decode":{"wallNanos":206252125,"cpuNanos":217935933,"allocatedBytes":277277216}},"jsvro":{"bytes":33719155,"gzipBytes":11934390,"encode":{"wallNanos":134615667,"cpuNanos":139881633,"allocatedBytes":248160384},"decode":{"wallNanos":147471042,"cpuNanos":158298600,"allocatedBytes":218083376}},"avro":{"bytes":23939510,"gzipBytes":15940911,"encode":{"wallNanos":77772709,"cpuNanos":77978233,"allocatedBytes":108415776},"decode":{"wallNanos":60746791,"cpuNanos":70722866,"allocatedBytes":270635704}}}},{"dataset":"Area","rows":10,"iterations":10000,"formats":{"json":{"bytes":4780,"gzipBytes":1394,"encode":{"wallNanos":16833,"cpuNanos":17075,"allocatedBytes":26776},"decode":{"wallNanos":12917,"cpuNanos":13116,"allocatedBytes":13640}},"jsvro":{"bytes":3277,"gzipBytes":1409,"encode":{"wallNanos":15417,"cpuNanos":16301,"allocatedBytes":26800},"decode":{"wallNanos":13250,"cpuNanos":13402,"allocatedBytes":16312}},"avro":{"bytes":2766,"gzipBytes":2139,"encode":{"wallNanos":7875,"cpuNanos":16753,"allocatedBytes":103504},"decode":{"wallNanos":11791,"cpuNanos":23734,"allocatedBytes":56872}}}},{"dataset":"Area","rows":20,"iterations":10000,"formats":{"json":{"bytes":9383,"gzipBytes":2546,"encode":{"wallNanos":33709,"cpuNanos":34033,"allocatedBytes":51696},"decode":{"wallNanos":25458,"cpuNanos":25845,"allocatedBytes":26256}},"jsvro":{"bytes":6140,"gzipBytes":2505,"encode":{"wallNanos":29709,"cpuNanos":29947,"allocatedBytes":51720},"decode":{"wallNanos":24625,"cpuNanos":24799,"allocatedBytes":28928}},"avro":{"bytes":4828,"gzipBytes":3727,"encode":{"wallNanos":13000,"cpuNanos":13224,"allocatedBytes":113464},"decode":{"wallNanos":16209,"cpuNanos":16446,"allocatedBytes":78536}}}},{"dataset":"Area","rows":30,"iterations":10000,"formats":{"json":{"bytes":14148,"gzipBytes":3744,"encode":{"wallNanos":52750,"cpuNanos":52692,"allocatedBytes":77944},"decode":{"wallNanos":38500,"cpuNanos":48707,"allocatedBytes":39360}},"jsvro":{"bytes":9081,"gzipBytes":3634,"encode":{"wallNanos":47084,"cpuNanos":47978,"allocatedBytes":77968},"decode":{"wallNanos":36959,"cpuNanos":37333,"allocatedBytes":42032}},"avro":{"bytes":6988,"gzipBytes":5410,"encode":{"wallNanos":18792,"cpuNanos":19768,"allocatedBytes":124160},"decode":{"wallNanos":21000,"cpuNanos":25891,"allocatedBytes":101104}}}},{"dataset":"Area","rows":40,"iterations":10000,"formats":{"json":{"bytes":18126,"gzipBytes":4723,"encode":{"wallNanos":64750,"cpuNanos":66093,"allocatedBytes":98472},"decode":{"wallNanos":48500,"cpuNanos":48989,"allocatedBytes":50024}},"jsvro":{"bytes":11547,"gzipBytes":4537,"encode":{"wallNanos":58167,"cpuNanos":60325,"allocatedBytes":98496},"decode":{"wallNanos":45500,"cpuNanos":45921,"allocatedBytes":52696}},"avro":{"bytes":8749,"gzipBytes":6734,"encode":{"wallNanos":23292,"cpuNanos":24777,"allocatedBytes":132440},"decode":{"wallNanos":25000,"cpuNanos":30559,"allocatedBytes":120144}}}},{"dataset":"Area","rows":50,"iterations":10000,"formats":{"json":{"bytes":22162,"gzipBytes":5681,"encode":{"wallNanos":81209,"cpuNanos":83058,"allocatedBytes":119336},"decode":{"wallNanos":59667,"cpuNanos":62131,"allocatedBytes":60968}},"jsvro":{"bytes":14047,"gzipBytes":5435,"encode":{"wallNanos":72334,"cpuNanos":73338,"allocatedBytes":119360},"decode":{"wallNanos":55833,"cpuNanos":56915,"allocatedBytes":63640}},"avro":{"bytes":10542,"gzipBytes":8073,"encode":{"wallNanos":27917,"cpuNanos":30026,"allocatedBytes":140992},"decode":{"wallNanos":30000,"cpuNanos":35661,"allocatedBytes":139616}}}},{"dataset":"Area","rows":100,"iterations":10000,"formats":{"json":{"bytes":43948,"gzipBytes":10995,"encode":{"wallNanos":158125,"cpuNanos":160133,"allocatedBytes":235416},"decode":{"wallNanos":117083,"cpuNanos":119348,"allocatedBytes":119256}},"jsvro":{"bytes":27565,"gzipBytes":10436,"encode":{"wallNanos":141959,"cpuNanos":143873,"allocatedBytes":235440},"decode":{"wallNanos":106792,"cpuNanos":107995,"allocatedBytes":121928}},"avro":{"bytes":20266,"gzipBytes":15298,"encode":{"wallNanos":53042,"cpuNanos":56537,"allocatedBytes":188336},"decode":{"wallNanos":50541,"cpuNanos":58886,"allocatedBytes":242624}}}},{"dataset":"Area","rows":500,"iterations":6000,"formats":{"json":{"bytes":221053,"gzipBytes":53254,"encode":{"wallNanos":802375,"cpuNanos":795054,"allocatedBytes":1184384},"decode":{"wallNanos":593125,"cpuNanos":608046,"allocatedBytes":595768}},"jsvro":{"bytes":137458,"gzipBytes":49875,"encode":{"wallNanos":717083,"cpuNanos":739198,"allocatedBytes":1184408},"decode":{"wallNanos":540958,"cpuNanos":561158,"allocatedBytes":598440}},"avro":{"bytes":99460,"gzipBytes":71295,"encode":{"wallNanos":255167,"cpuNanos":271639,"allocatedBytes":576232},"decode":{"wallNanos":224667,"cpuNanos":241083,"allocatedBytes":1046768}}}},{"dataset":"Area","rows":1000,"iterations":3000,"formats":{"json":{"bytes":443750,"gzipBytes":106243,"encode":{"wallNanos":1540000,"cpuNanos":1596761,"allocatedBytes":2378648},"decode":{"wallNanos":1186167,"cpuNanos":1275652,"allocatedBytes":1195864}},"jsvro":{"bytes":275687,"gzipBytes":99113,"encode":{"wallNanos":1379000,"cpuNanos":1438507,"allocatedBytes":2378672},"decode":{"wallNanos":1026834,"cpuNanos":1101361,"allocatedBytes":1198536}},"avro":{"bytes":199224,"gzipBytes":141564,"encode":{"wallNanos":506250,"cpuNanos":544970,"allocatedBytes":1062400},"decode":{"wallNanos":443667,"cpuNanos":478852,"allocatedBytes":2066120}}}},{"dataset":"Area","rows":3000,"iterations":1000,"formats":{"json":{"bytes":1320850,"gzipBytes":314556,"encode":{"wallNanos":4306459,"cpuNanos":4543250,"allocatedBytes":7058464},"decode":{"wallNanos":3561333,"cpuNanos":3704554,"allocatedBytes":3564288}},"jsvro":{"bytes":819703,"gzipBytes":292105,"encode":{"wallNanos":3818458,"cpuNanos":4051412,"allocatedBytes":7058488},"decode":{"wallNanos":2993792,"cpuNanos":3198526,"allocatedBytes":3566960}},"avro":{"bytes":591774,"gzipBytes":417198,"encode":{"wallNanos":1507500,"cpuNanos":1616620,"allocatedBytes":2975184},"decode":{"wallNanos":1327250,"cpuNanos":1418260,"allocatedBytes":5905080}}}},{"dataset":"Area","rows":5000,"iterations":600,"formats":{"json":{"bytes":2206939,"gzipBytes":525582,"encode":{"wallNanos":6635584,"cpuNanos":6782951,"allocatedBytes":11805680},"decode":{"wallNanos":6069458,"cpuNanos":6196275,"allocatedBytes":5951992}},"jsvro":{"bytes":1369288,"gzipBytes":487821,"encode":{"wallNanos":6346833,"cpuNanos":6677480,"allocatedBytes":11805704},"decode":{"wallNanos":5088250,"cpuNanos":5418730,"allocatedBytes":5954664}},"avro":{"bytes":988431,"gzipBytes":696898,"encode":{"wallNanos":2639833,"cpuNanos":2905293,"allocatedBytes":4911272},"decode":{"wallNanos":2282333,"cpuNanos":2432628,"allocatedBytes":9767536}}}},{"dataset":"Area","rows":10000,"iterations":300,"formats":{"json":{"bytes":4414893,"gzipBytes":1049619,"encode":{"wallNanos":14005500,"cpuNanos":14827046,"allocatedBytes":23612144},"decode":{"wallNanos":12435292,"cpuNanos":13270716,"allocatedBytes":11923288}},"jsvro":{"bytes":2739402,"gzipBytes":973996,"encode":{"wallNanos":12677875,"cpuNanos":13277386,"allocatedBytes":23612168},"decode":{"wallNanos":10176625,"cpuNanos":10918643,"allocatedBytes":11925960}},"avro":{"bytes":1976669,"gzipBytes":1391539,"encode":{"wallNanos":5329625,"cpuNanos":5673483,"allocatedBytes":9721256},"decode":{"wallNanos":4523833,"cpuNanos":5022876,"allocatedBytes":19386648}}}},{"dataset":"Area","rows":20000,"iterations":150,"formats":{"json":{"bytes":8829187,"gzipBytes":2097251,"encode":{"wallNanos":25948500,"cpuNanos":26549126,"allocatedBytes":47208056},"decode":{"wallNanos":24603542,"cpuNanos":24969060,"allocatedBytes":23747184}},"jsvro":{"bytes":5478748,"gzipBytes":1945766,"encode":{"wallNanos":24889125,"cpuNanos":26390506,"allocatedBytes":47208080},"decode":{"wallNanos":20128792,"cpuNanos":20761806,"allocatedBytes":23749856}},"avro":{"bytes":3952491,"gzipBytes":2780615,"encode":{"wallNanos":10332875,"cpuNanos":11008133,"allocatedBytes":19347880},"decode":{"wallNanos":8793000,"cpuNanos":9494680,"allocatedBytes":38262520}}}},{"dataset":"Area","rows":30000,"iterations":100,"formats":{"json":{"bytes":13279663,"gzipBytes":3155263,"encode":{"wallNanos":38989417,"cpuNanos":39962110,"allocatedBytes":71063256},"decode":{"wallNanos":35938292,"cpuNanos":37430280,"allocatedBytes":35720064}},"jsvro":{"bytes":8241124,"gzipBytes":2927283,"encode":{"wallNanos":37709208,"cpuNanos":39716060,"allocatedBytes":71063280},"decode":{"wallNanos":29784917,"cpuNanos":30833610,"allocatedBytes":35722736}},"avro":{"bytes":5945632,"gzipBytes":4183236,"encode":{"wallNanos":15345667,"cpuNanos":16123070,"allocatedBytes":29067072},"decode":{"wallNanos":13094750,"cpuNanos":14855200,"allocatedBytes":57376688}}}},{"dataset":"Area","rows":50000,"iterations":60,"formats":{"json":{"bytes":22130666,"gzipBytes":5257821,"encode":{"wallNanos":64654917,"cpuNanos":66165766,"allocatedBytes":118418552},"decode":{"wallNanos":59689334,"cpuNanos":62032450,"allocatedBytes":59751640}},"jsvro":{"bytes":13733867,"gzipBytes":4877506,"encode":{"wallNanos":60050708,"cpuNanos":63842300,"allocatedBytes":118418576},"decode":{"wallNanos":48836750,"cpuNanos":50468866,"allocatedBytes":59754312}},"avro":{"bytes":9908174,"gzipBytes":6969632,"encode":{"wallNanos":25685625,"cpuNanos":26691216,"allocatedBytes":48379064},"decode":{"wallNanos":21884000,"cpuNanos":25768950,"allocatedBytes":95582104}}}},{"dataset":"Area","rows":100000,"iterations":30,"formats":{"json":{"bytes":44292502,"gzipBytes":10523461,"encode":{"wallNanos":126719459,"cpuNanos":130259133,"allocatedBytes":237064032},"decode":{"wallNanos":118975458,"cpuNanos":121760800,"allocatedBytes":119165800}},"jsvro":{"bytes":27487843,"gzipBytes":9762952,"encode":{"wallNanos":117309417,"cpuNanos":121199466,"allocatedBytes":237064056},"decode":{"wallNanos":102128791,"cpuNanos":107964533,"allocatedBytes":119168472}},"avro":{"bytes":19829378,"gzipBytes":13952489,"encode":{"wallNanos":53655292,"cpuNanos":54650833,"allocatedBytes":96749032},"decode":{"wallNanos":44500459,"cpuNanos":56766633,"allocatedBytes":190363480}}}},{"dataset":"FxTransaction","rows":10,"iterations":10000,"formats":{"json":{"bytes":15471,"gzipBytes":4177,"encode":{"wallNanos":35084,"cpuNanos":38538,"allocatedBytes":36128},"decode":{"wallNanos":52792,"cpuNanos":55322,"allocatedBytes":89752}},"jsvro":{"bytes":9823,"gzipBytes":3866,"encode":{"wallNanos":30000,"cpuNanos":30371,"allocatedBytes":36152},"decode":{"wallNanos":38375,"cpuNanos":39138,"allocatedBytes":96432}},"avro":{"bytes":9752,"gzipBytes":4831,"encode":{"wallNanos":30917,"cpuNanos":34140,"allocatedBytes":129664},"decode":{"wallNanos":64458,"cpuNanos":79840,"allocatedBytes":224704}}}},{"dataset":"FxTransaction","rows":20,"iterations":10000,"formats":{"json":{"bytes":30798,"gzipBytes":7566,"encode":{"wallNanos":68375,"cpuNanos":68405,"allocatedBytes":71168},"decode":{"wallNanos":104458,"cpuNanos":105628,"allocatedBytes":182032}},"jsvro":{"bytes":17498,"gzipBytes":6875,"encode":{"wallNanos":58917,"cpuNanos":59986,"allocatedBytes":71192},"decode":{"wallNanos":70417,"cpuNanos":71692,"allocatedBytes":178712}},"avro":{"bytes":14833,"gzipBytes":8240,"encode":{"wallNanos":50416,"cpuNanos":51661,"allocatedBytes":145616},"decode":{"wallNanos":78084,"cpuNanos":96196,"allocatedBytes":279296}}}},{"dataset":"FxTransaction","rows":30,"iterations":10000,"formats":{"json":{"bytes":46239,"gzipBytes":10924,"encode":{"wallNanos":103041,"cpuNanos":105982,"allocatedBytes":107472},"decode":{"wallNanos":156625,"cpuNanos":159019,"allocatedBytes":272352}},"jsvro":{"bytes":25215,"gzipBytes":9887,"encode":{"wallNanos":88625,"cpuNanos":88656,"allocatedBytes":107496},"decode":{"wallNanos":100250,"cpuNanos":101612,"allocatedBytes":259032}},"avro":{"bytes":19894,"gzipBytes":11613,"encode":{"wallNanos":69458,"cpuNanos":70495,"allocatedBytes":161744},"decode":{"wallNanos":91500,"cpuNanos":111447,"allocatedBytes":332656}}}},{"dataset":"FxTransaction","rows":40,"iterations":10000,"formats":{"json":{"bytes":62471,"gzipBytes":14495,"encode":{"wallNanos":141084,"cpuNanos":140922,"allocatedBytes":148792},"decode":{"wallNanos":212625,"cpuNanos":214612,"allocatedBytes":365264}},"jsvro":{"bytes":33471,"gzipBytes":13072,"encode":{"wallNanos":120666,"cpuNanos":121121,"allocatedBytes":148816},"decode":{"wallNanos":133416,"cpuNanos":136145,"allocatedBytes":341944}},"avro":{"bytes":25371,"gzipBytes":15298,"encode":{"wallNanos":88333,"cpuNanos":90283,"allocatedBytes":180000},"decode":{"wallNanos":106209,"cpuNanos":135753,"allocatedBytes":390280}}}},{"dataset":"FxTransaction","rows":50,"iterations":10000,"formats":{"json":{"bytes":77876,"gzipBytes":17806,"encode":{"wallNanos":172042,"cpuNanos":174943,"allocatedBytes":184360},"decode":{"wallNanos":261709,"cpuNanos":265203,"allocatedBytes":454216}},"jsvro":{"bytes":41164,"gzipBytes":15984,"encode":{"wallNanos":146542,"cpuNanos":147944,"allocatedBytes":184384},"decode":{"wallNanos":162584,"cpuNanos":169165,"allocatedBytes":420896}},"avro":{"bytes":30450,"gzipBytes":18623,"encode":{"wallNanos":109125,"cpuNanos":113035,"allocatedBytes":195960},"decode":{"wallNanos":123500,"cpuNanos":150137,"allocatedBytes":444448}}}},{"dataset":"FxTransaction","rows":100,"iterations":10000,"formats":{"json":{"bytes":155895,"gzipBytes":34600,"encode":{"wallNanos":345709,"cpuNanos":360934,"allocatedBytes":371424},"decode":{"wallNanos":521125,"cpuNanos":530299,"allocatedBytes":907568}},"jsvro":{"bytes":80239,"gzipBytes":30791,"encode":{"wallNanos":296167,"cpuNanos":301616,"allocatedBytes":371448},"decode":{"wallNanos":326208,"cpuNanos":349492,"allocatedBytes":824248}},"avro":{"bytes":56175,"gzipBytes":35535,"encode":{"wallNanos":207250,"cpuNanos":219221,"allocatedBytes":279584},"decode":{"wallNanos":193458,"cpuNanos":216895,"allocatedBytes":717480}}}},{"dataset":"FxTransaction","rows":500,"iterations":6000,"formats":{"json":{"bytes":783438,"gzipBytes":170218,"encode":{"wallNanos":1738042,"cpuNanos":1780474,"allocatedBytes":1872984},"decode":{"wallNanos":2655959,"cpuNanos":2869697,"allocatedBytes":4530144}},"jsvro":{"bytes":395618,"gzipBytes":149461,"encode":{"wallNanos":1498000,"cpuNanos":1601166,"allocatedBytes":1873008},"decode":{"wallNanos":1621083,"cpuNanos":1733672,"allocatedBytes":4046824}},"avro":{"bytes":264613,"gzipBytes":171237,"encode":{"wallNanos":1007250,"cpuNanos":1086390,"allocatedBytes":951120},"decode":{"wallNanos":765875,"cpuNanos":821010,"allocatedBytes":2783592}}}},{"dataset":"FxTransaction","rows":1000,"iterations":3000,"formats":{"json":{"bytes":1572035,"gzipBytes":340385,"encode":{"wallNanos":3518625,"cpuNanos":3666055,"allocatedBytes":3786664},"decode":{"wallNanos":5317542,"cpuNanos":5674140,"allocatedBytes":9078016}},"jsvro":{"bytes":792303,"gzipBytes":298710,"encode":{"wallNanos":3022459,"cpuNanos":3233280,"allocatedBytes":3786688},"decode":{"wallNanos":3251542,"cpuNanos":3493825,"allocatedBytes":8094696}},"avro":{"bytes":526748,"gzipBytes":342339,"encode":{"wallNanos":1960125,"cpuNanos":2086901,"allocatedBytes":1803512},"decode":{"wallNanos":1505334,"cpuNanos":1660822,"allocatedBytes":5293208}}}},{"dataset":"FxTransaction","rows":3000,"iterations":1000,"formats":{"json":{"bytes":4723059,"gzipBytes":1021074,"encode":{"wallNanos":10752250,"cpuNanos":11382599,"allocatedBytes":11403296},"decode":{"wallNanos":15963416,"cpuNanos":17091519,"allocatedBytes":27276880}},"jsvro":{"bytes":2377791,"gzipBytes":895288,"encode":{"wallNanos":9301042,"cpuNanos":9851111,"allocatedBytes":11403320},"decode":{"wallNanos":9790416,"cpuNanos":10515008,"allocatedBytes":24293560}},"avro":{"bytes":1575356,"gzipBytes":1026358,"encode":{"wallNanos":5990208,"cpuNanos":6287536,"allocatedBytes":5198184},"decode":{"wallNanos":4317375,"cpuNanos":4642589,"allocatedBytes":15323392}}}},{"dataset":"FxTransaction","rows":5000,"iterations":600,"formats":{"json":{"bytes":7866797,"gzipBytes":1699000,"encode":{"wallNanos":17739333,"cpuNanos":18865328,"allocatedBytes":18955888},"decode":{"wallNanos":26462833,"cpuNanos":28504763,"allocatedBytes":45400824}},"jsvro":{"bytes":3958573,"gzipBytes":1489108,"encode":{"wallNanos":15239334,"cpuNanos":16248075,"allocatedBytes":18955912},"decode":{"wallNanos":16155500,"cpuNanos":17367706,"allocatedBytes":40417504}},"avro":{"bytes":2620137,"gzipBytes":1706167,"encode":{"wallNanos":10010500,"cpuNanos":10350696,"allocatedBytes":8568984},"decode":{"wallNanos":7150833,"cpuNanos":7671310,"allocatedBytes":25320432}}}},{"dataset":"FxTransaction","rows":10000,"iterations":300,"formats":{"json":{"bytes":15744028,"gzipBytes":3401308,"encode":{"wallNanos":35615000,"cpuNanos":37044250,"allocatedBytes":38011024},"decode":{"wallNanos":53601708,"cpuNanos":57681890,"allocatedBytes":90978096}},"jsvro":{"bytes":7922600,"gzipBytes":2980886,"encode":{"wallNanos":30496583,"cpuNanos":32438820,"allocatedBytes":38011048},"decode":{"wallNanos":32438833,"cpuNanos":34904970,"allocatedBytes":80994776}},"avro":{"bytes":5241398,"gzipBytes":3415525,"encode":{"wallNanos":20071167,"cpuNanos":20536540,"allocatedBytes":17083392},"decode":{"wallNanos":14248292,"cpuNanos":15083343,"allocatedBytes":50516904}}}},{"dataset":"FxTransaction","rows":20000,"iterations":150,"formats":{"json":{"bytes":31471602,"gzipBytes":6797428,"encode":{"wallNanos":71235792,"cpuNanos":73947553,"allocatedBytes":75904984},"decode":{"wallNanos":107136416,"cpuNanos":115438513,"allocatedBytes":181811816}},"jsvro":{"bytes":15832094,"gzipBytes":5957060,"encode":{"wallNanos":61984417,"cpuNanos":65147913,"allocatedBytes":75905008},"decode":{"wallNanos":65839167,"cpuNanos":70600653,"allocatedBytes":161828496}},"avro":{"bytes":10470596,"gzipBytes":6823970,"encode":{"wallNanos":40010625,"cpuNanos":40375513,"allocatedBytes":34017800},"decode":{"wallNanos":28359709,"cpuNanos":30473206,"allocatedBytes":100577344}}}},{"dataset":"FxTransaction","rows":30000,"iterations":100,"formats":{"json":{"bytes":47202936,"gzipBytes":10196081,"encode":{"wallNanos":108491083,"cpuNanos":109233080,"allocatedBytes":113814992},"decode":{"wallNanos":158972167,"cpuNanos":170705800,"allocatedBytes":272679040}},"jsvro":{"bytes":23744316,"gzipBytes":8933377,"encode":{"wallNanos":92946625,"cpuNanos":97821350,"allocatedBytes":113815016},"decode":{"wallNanos":99540959,"cpuNanos":106583820,"allocatedBytes":242695720}},"avro":{"bytes":15701735,"gzipBytes":10234702,"encode":{"wallNanos":60696250,"cpuNanos":61189500,"allocatedBytes":50954808},"decode":{"wallNanos":43501625,"cpuNanos":47405550,"allocatedBytes":150612784}}}},{"dataset":"FxTransaction","rows":50000,"iterations":60,"formats":{"json":{"bytes":78669744,"gzipBytes":16992764,"encode":{"wallNanos":178777916,"cpuNanos":180517416,"allocatedBytes":189709856},"decode":{"wallNanos":274932083,"cpuNanos":295244966,"allocatedBytes":454895032}},"jsvro":{"bytes":39574112,"gzipBytes":14887118,"encode":{"wallNanos":156899042,"cpuNanos":163977283,"allocatedBytes":189709880},"decode":{"wallNanos":167916291,"cpuNanos":182877700,"allocatedBytes":404911712}},"avro":{"bytes":26165754,"gzipBytes":17053628,"encode":{"wallNanos":101666791,"cpuNanos":102198316,"allocatedBytes":84874720},"decode":{"wallNanos":72143625,"cpuNanos":83500183,"allocatedBytes":251050504}}}},{"dataset":"FxTransaction","rows":100000,"iterations":30,"formats":{"json":{"bytes":157353573,"gzipBytes":33985815,"encode":{"wallNanos":361110458,"cpuNanos":363320766,"allocatedBytes":379534800},"decode":{"wallNanos":539529000,"cpuNanos":601542900,"allocatedBytes":909511152}},"jsvro":{"bytes":79155769,"gzipBytes":29776004,"encode":{"wallNanos":305579000,"cpuNanos":307053800,"allocatedBytes":379534824},"decode":{"wallNanos":328270084,"cpuNanos":386819966,"allocatedBytes":809527832}},"avro":{"bytes":52336429,"gzipBytes":34109839,"encode":{"wallNanos":207243417,"cpuNanos":207594500,"allocatedBytes":169688584},"decode":{"wallNanos":145840542,"cpuNanos":176893366,"allocatedBytes":501323232}}}}],"datasets":[{"description":"Records: person → address → postal area (class) → boundary points","name":"Person"},{"description":"Plain classes with setters: area → boundary polygon of 4–16 points","name":"Area"},{"description":"A 36-field record: transaction → owner person → address → postal area → boundary points","name":"FxTransaction"}],"cpuCount":11,"javaVersion":"21.0.6+7-LTS","generatedAt":"2026-09-25T10:18:09Z"};
+
+const BASELINES = [
+  { key: "json", name: "JSON", title: "JSVRO compared with plain Jackson JSON",
+    subtitle: "Both formats are human-readable text. Wire size, and the time, CPU and memory needed to encode and "
+      + "decode the same rows, for each aggregate root and row count." },
+  { key: "avro", name: "Avro", title: "JSVRO compared with Avro",
+    subtitle: "Avro is binary and not human-readable; JSVRO stays readable JSON. This shows what that readability "
+      + "costs, for the same rows, aggregate roots and row counts." },
+];
+let activeBaseline = BASELINES[0];
+
+const METRICS = [
+  { key: "saved", label: "Saved", help: b => `Saved = 1 − JSVRO ÷ ${b}. Above zero favours JSVRO.`,
+    fromRatio: r => 100 * (1 - r), format: v => (v > 0 ? "+" : "") + v.toFixed(0) + "%",
+    tick: v => +v.toFixed(1) + "%", parity: 0, higherIsBetter: true },
+  { key: "takes", label: "JSVRO takes", help: b => `JSVRO takes = JSVRO ÷ ${b}. Below the ${b} line favours JSVRO.`,
+    fromRatio: r => 100 * r, format: v => v.toFixed(0) + "%",
+    tick: v => +v.toFixed(1) + "%", parity: 100, higherIsBetter: false },
+  { key: "throughput", label: "Throughput", help: b => `Throughput = ${b} ÷ JSVRO, rows handled per unit of the resource. Above the ${b} line favours JSVRO.`,
+    fromRatio: r => 1 / r, format: v => v.toFixed(2) + "×",
+    tick: v => +v.toFixed(2) + "×", parity: 1, higherIsBetter: true },
+];
+
+const DIMENSIONS = {
+  size: { label: "Raw size", series: "--series-4", unit: "bytes" },
+  gzip: { label: "Gzip size", series: "--series-5", unit: "bytes" },
+  time: { label: "Time", series: "--series-1", unit: "nanos" },
+  cpu: { label: "CPU", series: "--series-2", unit: "nanos" },
+  memory: { label: "Memory allocated", series: "--series-3", unit: "bytes" },
+};
+
+const OPERATIONS = [
+  { key: "size", title: "Wire size", dimensions: ["size", "gzip"] },
+  { key: "encode", title: "Encode", dimensions: ["time", "cpu", "memory"] },
+  { key: "decode", title: "Decode", dimensions: ["time", "cpu", "memory"] },
+];
+
+const SERIES = OPERATIONS.flatMap(operation => operation.dimensions.map(dimension => ({ operation, dimension,
+  label: operation.key === "size" ? DIMENSIONS[dimension].label : `${operation.title} ${DIMENSIONS[dimension].label.toLowerCase()}` })));
+
+function amounts(row, operation, dimension) {
+  const field = { time: "wallNanos", cpu: "cpuNanos", memory: "allocatedBytes" }[dimension];
+  const pick = format => operation === "size"
+    ? (dimension === "size" ? format.bytes : format.gzipBytes)
+    : format[operation][field];
+  return { base: pick(row.formats[activeBaseline.key]), jsvro: pick(row.formats.jsvro) };
+}
+
+const SVG = "http://www.w3.org/2000/svg";
+const rowsLabel = n => n >= 1e3 ? (n / 1e3) + "k" : String(n);
+function formatAmount(value, unit) {
+  if (unit === "nanos") return (value / 1e6).toLocaleString("en-US", { maximumFractionDigits: 3 }) + " ms";
+  if (value >= 1e6) return (value / 1e6).toLocaleString("en-US", { maximumFractionDigits: 1 }) + " MB";
+  if (value >= 1e3) return (value / 1e3).toLocaleString("en-US", { maximumFractionDigits: 1 }) + " KB";
+  return value.toLocaleString("en-US") + " B";
+}
+
+function el(name, attributes = {}, parent) {
+  const node = document.createElementNS(SVG, name);
+  for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+  if (parent) parent.appendChild(node);
+  return node;
+}
+
+function buildRoots() {
+  const described = new Map((DATA.datasets ?? []).map(dataset => [dataset.name, dataset.description]));
+  const byName = new Map();
+  for (const row of DATA.results) {
+    if (!byName.has(row.dataset)) byName.set(row.dataset, []);
+    byName.get(row.dataset).push(row);
+  }
+  return [...byName].map(([name, rows]) => ({
+    name,
+    description: described.get(name) ?? "",
+    points: rows.sort((a, b) => a.rows - b.rows).map(row => ({
+      rows: row.rows,
+      iterations: row.iterations,
+      ratio: (operation, dimension) => {
+        const { base, jsvro } = amounts(row, operation, dimension);
+        return jsvro / base;
+      },
+      detail: (operation, dimension) => {
+        const { base, jsvro } = amounts(row, operation, dimension);
+        const unit = DIMENSIONS[dimension].unit;
+        return `${activeBaseline.name} ${formatAmount(base, unit)} → JSVRO ${formatAmount(jsvro, unit)}`;
+      },
+      amounts: (operation, dimension) => amounts(row, operation, dimension),
+    })),
+  }));
+}
+
+function buildSummary(roots) {
+  const shared = roots.reduce((counts, root) => counts.filter(n => root.points.some(p => p.rows === n)),
+    roots[0].points.map(p => p.rows));
+  const at = (root, n) => root.points.find(p => p.rows === n);
+  return {
+    name: "Summary",
+    get description() {
+      return `All ${roots.length} aggregate roots combined at each row count: the geometric mean of their JSVRO ÷ `
+        + `${activeBaseline.name} ratios, so each root counts equally regardless of how big its rows are.`;
+    },
+    points: shared.map(n => ({
+      rows: n,
+      perRoot: roots.map(root => ({ name: root.name, point: at(root, n) })),
+      ratio: (operation, dimension) =>
+        Math.exp(roots.reduce((sum, root) => sum + Math.log(at(root, n).ratio(operation, dimension)), 0) / roots.length),
+      detail: (operation, dimension) => roots.map(root =>
+        `${root.name} ${activeMetric.format(activeMetric.fromRatio(at(root, n).ratio(operation, dimension)))}`).join(" · "),
+    })),
+  };
+}
+
+function niceStep(range, maxTicks) {
+  const raw = range / maxTicks;
+  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  return [1, 2, 2.5, 5, 10].map(factor => factor * magnitude).find(step => step >= raw);
+}
+
+function domainFor(values) {
+  const low = Math.min(activeMetric.parity, ...values);
+  const high = Math.max(activeMetric.parity, ...values);
+  const step = niceStep(Math.max(high - low, activeMetric.parity === 1 ? 0.05 : 5), 4);
+  return { min: Math.floor(low / step) * step, max: Math.ceil(high / step) * step, step };
+}
+
+const tooltip = document.getElementById("tooltip");
+
+function showTooltip(anchor, view, operation, point) {
+  tooltip.replaceChildren();
+  const heading = document.createElement("div");
+  heading.className = "heading";
+  heading.textContent = `${view.name} · ${operation.title} · ${point.rows.toLocaleString("en-US")} rows`;
+  tooltip.appendChild(heading);
+  for (const dimension of operation.dimensions) {
+    const line = document.createElement("div");
+    line.className = "row";
+    const key = document.createElement("span");
+    key.className = "line-key";
+    key.style.background = `var(${DIMENSIONS[dimension].series})`;
+    const value = document.createElement("span");
+    value.className = "value";
+    value.textContent = activeMetric.format(activeMetric.fromRatio(point.ratio(operation.key, dimension)));
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = DIMENSIONS[dimension].label;
+    const detail = document.createElement("span");
+    detail.className = "detail";
+    detail.textContent = point.detail(operation.key, dimension);
+    line.append(key, value, name, detail);
+    tooltip.appendChild(line);
+  }
+  tooltip.style.display = "block";
+  const box = tooltip.getBoundingClientRect();
+  const left = anchor.x + 16 + box.width > window.innerWidth ? anchor.x - box.width - 16 : anchor.x + 16;
+  tooltip.style.left = Math.max(8, left) + "px";
+  tooltip.style.top = Math.max(8, Math.min(window.innerHeight - box.height - 8, anchor.y - box.height / 2)) + "px";
+}
+
+const hideTooltip = () => { tooltip.style.display = "none"; };
+
+function bestPoint(points, operation, dimension) {
+  return points.reduce((best, point) => {
+    const value = activeMetric.fromRatio(point.ratio(operation.key, dimension));
+    const bestValue = activeMetric.fromRatio(best.ratio(operation.key, dimension));
+    return (activeMetric.higherIsBetter ? value > bestValue : value < bestValue) ? point : best;
+  });
+}
+
+function renderChart(container, view, operation, domain) {
+  const points = view.points;
+  const height = 220;
+  const margin = { top: 12, right: 44, bottom: 42, left: 52 };
+
+  const card = document.createElement("section");
+  card.className = "card";
+  const title = document.createElement("h3");
+  title.textContent = operation.title;
+  const legend = document.createElement("ul");
+  legend.className = "legend";
+  for (const dimension of operation.dimensions) {
+    const best = bestPoint(points, operation, dimension);
+    const item = document.createElement("li");
+    const key = document.createElement("span");
+    key.className = "key";
+    key.style.background = `var(${DIMENSIONS[dimension].series})`;
+    const label = document.createElement("span");
+    label.textContent = DIMENSIONS[dimension].label;
+    const note = document.createElement("span");
+    note.className = "best";
+    note.textContent = `· best ${activeMetric.format(activeMetric.fromRatio(best.ratio(operation.key, dimension)))} at ${rowsLabel(best.rows)}`;
+    item.append(key, label, note);
+    legend.appendChild(item);
+  }
+  card.append(title, legend);
+  container.appendChild(card);
+  return () => drawChart(card, view, operation, domain);
+}
+
+function drawChart(card, view, operation, domain) {
+  const points = view.points;
+  const height = 220;
+  const margin = { top: 12, right: 44, bottom: 42, left: 52 };
+  const width = Math.max(260, card.clientWidth - 32);
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const logMin = Math.log10(points[0].rows);
+  const logMax = Math.log10(points[points.length - 1].rows);
+  const x = n => margin.left + (logMax === logMin ? plotWidth / 2 : (Math.log10(n) - logMin) / (logMax - logMin) * plotWidth);
+  const y = v => margin.top + (domain.max - v) / (domain.max - domain.min) * plotHeight;
+
+  const svg = el("svg", { width, height, viewBox: `0 0 ${width} ${height}`, tabindex: 0, role: "img",
+    "aria-label": `${view.name}, ${operation.title}: ${metricLabel(activeMetric)} by rows per stream. `
+      + "Use the left and right arrow keys to read each row count." }, card);
+
+  for (let tick = domain.min; tick <= domain.max + domain.step / 1e6; tick += domain.step) {
+    el("line", { x1: margin.left, x2: width - margin.right, y1: y(tick), y2: y(tick), stroke: "var(--grid)", "stroke-width": 1 }, svg);
+    el("text", { x: margin.left - 8, y: y(tick) + 4, "text-anchor": "end", class: "tick" }, svg).textContent = activeMetric.tick(tick);
+  }
+  for (let decade = 10 ** Math.ceil(logMin); decade <= points[points.length - 1].rows; decade *= 10) {
+    el("text", { x: x(decade), y: height - margin.bottom + 18, "text-anchor": "middle", class: "tick" }, svg).textContent = rowsLabel(decade);
+  }
+  el("text", { x: margin.left + plotWidth / 2, y: height - 4, "text-anchor": "middle", class: "axis-title" }, svg)
+    .textContent = "Rows per stream (log scale)";
+
+  el("line", { x1: margin.left, x2: width - margin.right, y1: y(activeMetric.parity), y2: y(activeMetric.parity),
+    stroke: "var(--reference)", "stroke-width": 1 }, svg);
+  el("text", { x: width - margin.right + 6, y: y(activeMetric.parity) + 4, class: "reference-label" }, svg).textContent = activeBaseline.name;
+
+  const crosshair = el("line", { y1: margin.top, y2: margin.top + plotHeight, stroke: "var(--baseline)",
+    "stroke-width": 1, visibility: "hidden" }, svg);
+
+  for (const dimension of operation.dimensions) {
+    const coordinates = points.map(point =>
+      [x(point.rows), y(activeMetric.fromRatio(point.ratio(operation.key, dimension)))]);
+    el("path", { d: coordinates.map((c, index) => (index ? "L" : "M") + c.join(",")).join(""),
+      fill: "none", stroke: `var(${DIMENSIONS[dimension].series})`, "stroke-width": 2,
+      "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    for (const [cx, cy] of coordinates) {
+      el("circle", { cx, cy, r: 4, fill: `var(${DIMENSIONS[dimension].series})`, stroke: "var(--surface-1)", "stroke-width": 2 }, svg);
+    }
+  }
+
+  let active = -1;
+  function select(index) {
+    active = index;
+    const px = x(points[index].rows);
+    crosshair.setAttribute("x1", px);
+    crosshair.setAttribute("x2", px);
+    crosshair.setAttribute("visibility", "visible");
+    const box = svg.getBoundingClientRect();
+    showTooltip({ x: box.left + px, y: box.top + margin.top + plotHeight / 2 }, view, operation, points[index]);
+  }
+  function clear() {
+    active = -1;
+    crosshair.setAttribute("visibility", "hidden");
+    hideTooltip();
+  }
+  const hit = el("rect", { x: margin.left - 12, y: margin.top, width: plotWidth + 24, height: plotHeight, fill: "transparent" }, svg);
+  hit.addEventListener("pointermove", event => {
+    const px = event.clientX - svg.getBoundingClientRect().left;
+    let nearest = 0;
+    points.forEach((point, index) => {
+      if (Math.abs(x(point.rows) - px) < Math.abs(x(points[nearest].rows) - px)) nearest = index;
+    });
+    if (nearest !== active) select(nearest);
+  });
+  hit.addEventListener("pointerleave", clear);
+  svg.addEventListener("keydown", event => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const step = event.key === "ArrowRight" ? 1 : -1;
+    const start = active < 0 ? (step > 0 ? -1 : points.length) : active;
+    select(Math.min(points.length - 1, Math.max(0, start + step)));
+  });
+  svg.addEventListener("blur", clear);
+}
+
+function table(headings, rows) {
+  const node = document.createElement("table");
+  const head = node.createTHead().insertRow();
+  for (const heading of headings) {
+    const cell = document.createElement("th");
+    cell.textContent = heading;
+    head.appendChild(cell);
+  }
+  const body = node.createTBody();
+  for (const values of rows) {
+    const tr = body.insertRow();
+    for (const value of values) tr.insertCell().textContent = value;
+  }
+  return node;
+}
+
+function rootTable(view) {
+  return table(["Rows", "Dimension", "Iterations", activeBaseline.name, "JSVRO", ...METRICS.map(metricLabel)],
+    view.points.flatMap(point => SERIES.map(({ operation, dimension, label }) => {
+      const { base, jsvro } = point.amounts(operation.key, dimension);
+      const unit = DIMENSIONS[dimension].unit;
+      return [point.rows.toLocaleString("en-US"), label, point.iterations.toLocaleString("en-US"),
+        formatAmount(base, unit), formatAmount(jsvro, unit), ...METRICS.map(m => m.format(m.fromRatio(jsvro / base)))];
+    })));
+}
+
+function summaryTable(view) {
+  const names = view.points[0].perRoot.map(entry => entry.name);
+  return table(["Rows", "Dimension", ...names, "Combined"],
+    view.points.flatMap(point => SERIES.map(({ operation, dimension, label }) => [
+      point.rows.toLocaleString("en-US"), label,
+      ...point.perRoot.map(entry => activeMetric.format(activeMetric.fromRatio(entry.point.ratio(operation.key, dimension)))),
+      activeMetric.format(activeMetric.fromRatio(point.ratio(operation.key, dimension)))])));
+}
+
+const ROOTS = buildRoots();
+const SUMMARY = buildSummary(ROOTS);
+const VIEWS = [SUMMARY, ...ROOTS];
+let activeView = SUMMARY;
+let activeMetric = METRICS[0];
+let tableOpen = false;
+
+function renderPage() {
+  const container = document.getElementById("page");
+  const open = container.querySelector("details");
+  if (open) tableOpen = open.open;
+  container.replaceChildren();
+  document.getElementById("title").textContent = activeBaseline.title;
+  document.title = activeBaseline.title;
+  document.getElementById("subtitle").textContent = activeBaseline.subtitle;
+  document.getElementById("metric-help").textContent = activeMetric.help(activeBaseline.name);
+  document.querySelectorAll("#metrics button").forEach((button, index) => {
+    button.textContent = metricLabel(METRICS[index]);
+  });
+
+  const page = document.createElement("section");
+  page.className = "page";
+  const heading = document.createElement("h2");
+  heading.textContent = activeView.name;
+  const description = document.createElement("p");
+  description.textContent = activeView.description;
+  const grid = document.createElement("div");
+  grid.className = "grid";
+  page.append(heading, description, grid);
+  container.appendChild(page);
+
+  const draws = OPERATIONS.map(operation => {
+    const values = VIEWS.flatMap(view => view.points.flatMap(point =>
+      operation.dimensions.map(dimension => activeMetric.fromRatio(point.ratio(operation.key, dimension)))));
+    return renderChart(grid, activeView, operation, domainFor(values));
+  });
+  draws.forEach(draw => draw());
+
+  const details = document.createElement("details");
+  details.open = tableOpen;
+  const summary = document.createElement("summary");
+  summary.textContent = activeView === SUMMARY
+    ? `Table view (${metricLabel(activeMetric).toLowerCase()} per aggregate root and combined)`
+    : "Table view";
+  details.append(summary, activeView === SUMMARY ? summaryTable(activeView) : rootTable(activeView));
+  page.appendChild(details);
+}
+
+function metricLabel(metric) {
+  return metric.key === "throughput" ? `Throughput vs ${activeBaseline.name}` : metric.label;
+}
+
+function segmented(containerId, options, isActive, onSelect) {
+  const group = document.getElementById(containerId);
+  const buttons = options.map(option => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = option.label ?? option.name;
+    button.setAttribute("aria-pressed", String(isActive(option)));
+    button.addEventListener("click", () => {
+      buttons.forEach(other => other.setAttribute("aria-pressed", String(other === button)));
+      onSelect(option);
+      renderPage();
+    });
+    group.appendChild(button);
+    return button;
+  });
+}
+
+segmented("baselines", BASELINES, baseline => baseline === activeBaseline, baseline => { activeBaseline = baseline; });
+segmented("pages", VIEWS, view => view === activeView, view => { activeView = view; });
+segmented("metrics", METRICS, metric => metric === activeMetric, metric => { activeMetric = metric; });
+renderPage();
+let resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(renderPage, 150);
+});
+document.getElementById("note").textContent =
+  `Run ${DATA.generatedAt} on Java ${DATA.javaVersion} with ${DATA.cpuCount} CPUs. `
+  + "Time is the median wall-clock time per operation. CPU is the whole process's CPU time per operation, averaged "
+  + "over the measured runs, so it includes garbage collection and JIT threads; at the smallest row counts an "
+  + "operation takes microseconds and those background threads dominate, so CPU readings there are unreliable. Memory is the median bytes allocated "
+  + "per operation on the benchmark thread; encoding writes to a counting stream so output buffers are not counted. "
+  + "Avro is measured as an object container file without compression, using classes generated from Avro schemas; "
+  + "mapping between the benchmark objects and the generated classes is included in encode and decode, as it would be "
+  + "in an application. Chart scales are shared between the summary and every aggregate root, per chart type and "
+  + "baseline.";
+</script>
+</body>
+</html>
