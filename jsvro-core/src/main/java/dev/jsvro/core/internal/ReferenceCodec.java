@@ -4,6 +4,8 @@ import dev.jsvro.core.JsvroColumn;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.SerializationContext;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
@@ -30,6 +32,11 @@ final class ReferenceCodec implements ValueCodec {
     @Override
     public JsvroColumn column(String name) {
         return contentCodec.column(name);
+    }
+
+    @Override
+    public boolean collectObjectTypes(Map<Class<?>, List<String>> columnsByType) {
+        return contentCodec.collectObjectTypes(columnsByType);
     }
 
     @Override

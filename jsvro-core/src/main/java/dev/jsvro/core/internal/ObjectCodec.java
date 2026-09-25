@@ -7,20 +7,37 @@ import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.ser.BeanPropertyWriter;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 final class ObjectCodec implements ValueCodec {
     private final Class<?> type;
-    private final List<Property> properties;
+    private final Property[] properties;
 
     ObjectCodec(Class<?> type, List<Property> properties) {
         this.type = type;
-        this.properties = List.copyOf(properties);
+        this.properties = properties.toArray(Property[]::new);
     }
 
     @Override
     public JsvroColumn column(String name) {
-        return JsvroColumn.object(name, properties.stream().map(Property::column).toList());
+        return JsvroColumn.object(name, Arrays.stream(properties).map(Property::column).toList());
+    }
+
+    @Override
+    public boolean collectObjectTypes(Map<Class<?>, List<String>> columnsByType) {
+        List<String> columns = Arrays.stream(properties).map(property -> property.writer().getName()).toList();
+        List<String> existing = columnsByType.putIfAbsent(type, columns);
+        if (existing != null && !existing.equals(columns)) {
+            return false;
+        }
+        for (Property property : properties) {
+            if (!property.codec().collectObjectTypes(columnsByType)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
@@ -35,7 +52,7 @@ final class ObjectCodec implements ValueCodec {
                     + "; subtype properties cannot be represented positionally");
         }
 
-        generator.writeStartArray(value, properties.size());
+        generator.writeStartArray(value, properties.length);
         for (Property property : properties) {
             property.write(value, generator, context);
         }

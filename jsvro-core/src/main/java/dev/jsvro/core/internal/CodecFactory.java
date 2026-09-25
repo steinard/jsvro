@@ -9,6 +9,7 @@ import tools.jackson.databind.JavaType;
 import tools.jackson.databind.SerializationContext;
 
 import java.io.OutputStream;
+import java.io.StringWriter;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class CodecFactory {
@@ -31,15 +32,28 @@ public final class CodecFactory {
         return roots.computeIfAbsent(type, this::build) instanceof RootCodec;
     }
 
+    public RowDecoder rowDecoder(JavaType type) {
+        return root(type).rowDecoder(mapper, type);
+    }
+
     public int cachedCodecCount() {
         return (int) roots.values().stream().filter(RootCodec.class::isInstance).count();
+    }
+
+    private String header(JsvroSchema schema) {
+        StringWriter header = new StringWriter();
+        try (JsonGenerator generator = mapper.writer().createGenerator(header)) {
+            SchemaWriter.write(generator, schema);
+        }
+        return header.toString();
     }
 
     private Object build(JavaType type) {
         try (JsonGenerator generator = mapper.createGenerator(OutputStream.nullOutputStream())) {
             SerializationContext context = RootCodec.context(generator);
             ObjectCodec codec = new SchemaDerivation(context).root(type);
-            return new RootCodec(new JsvroSchema(codec.column("root").columns()), codec);
+            JsvroSchema schema = new JsvroSchema(codec.column("root").columns());
+            return new RootCodec(schema, header(schema), codec);
         }
         catch (JsvroException ex) {
             return ex;

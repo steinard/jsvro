@@ -1,0 +1,104 @@
+[
+  {
+    "type": "record", "name": "AvroPoint", "namespace": "dev.jsvro.core.avro",
+    "fields": [
+      {"name": "lat", "type": "double"},
+      {"name": "lon", "type": "double"}
+    ]
+  },
+  {
+    "type": "enum", "name": "AvroAreaType", "namespace": "dev.jsvro.core.avro",
+    "symbols": ["COUNTRY", "COUNTY", "MUNICIPALITY", "POST"]
+  },
+  {
+    "type": "record", "name": "AvroArea", "namespace": "dev.jsvro.core.avro",
+    "fields": [
+      {"name": "areaType", "type": "AvroAreaType"},
+      {"name": "code", "type": "string"},
+      {"name": "shortName", "type": "string"},
+      {"name": "name", "type": "string"},
+      {"name": "boundary", "type": {"type": "array", "items": "AvroPoint"}}
+    ]
+  },
+  {
+    "type": "record", "name": "AvroAddress", "namespace": "dev.jsvro.core.avro",
+    "fields": [
+      {"name": "street", "type": "string"},
+      {"name": "city", "type": "string"},
+      {"name": "country", "type": "string"},
+      {"name": "postal", "type": "AvroArea"}
+    ]
+  },
+  {
+    "type": "record", "name": "AvroPerson", "namespace": "dev.jsvro.core.avro",
+    "fields": [
+      {"name": "name", "type": "string"},
+      {"name": "age", "type": "int"},
+      {"name": "born", "type": {"type": "int", "logicalType": "date"}},
+      {"name": "address", "type": "AvroAddress"},
+      {"name": "roles", "type": {"type": "array", "items": "string"}}
+    ]
+  },
+  {
+    "type": "enum", "name": "AvroSide", "namespace": "dev.jsvro.core.avro",
+    "symbols": ["BUY", "SELL"]
+  },
+  {
+    "type": "enum", "name": "AvroDirection", "namespace": "dev.jsvro.core.avro",
+    "symbols": ["INCOMING", "OUTGOING"]
+  },
+  {
+    "type": "enum", "name": "AvroPricingType", "namespace": "dev.jsvro.core.avro",
+    "symbols": ["MARKET", "AGREEMENT", "FEE", "REVERSAL", "RECALL", "SURPLUS", "OPERATOR_REVERSAL"]
+  },
+  {
+    "type": "enum", "name": "AvroFxTransactionFlow", "namespace": "dev.jsvro.core.avro",
+    "symbols": ["INSTANT", "STANDARD", "OFFER"]
+  },
+  {
+    "type": "enum", "name": "AvroFxTransactionState", "namespace": "dev.jsvro.core.avro",
+    "symbols": ["PROCESSING", "PARKED", "UNRESOLVED", "PRICED", "REJECTED", "RETRYABLE", "UNPRICEABLE",
+      "REVERSAL_IN_PROCESS", "CUSTOMER_REVERSED", "OPERATOR_REVERSED", "SYSTEM_REVERSED", "OUTDATED", "NOT_PROCESSABLE"]
+  },
+  {
+    "type": "record", "name": "AvroFxTransaction", "namespace": "dev.jsvro.core.avro",
+    "fields": [
+      {"name": "id", "type": "string"},
+      {"name": "idempotencyKey", "type": "string"},
+      {"name": "systemId", "type": "string"},
+      {"name": "systemReferenceId", "type": "string"},
+      {"name": "correlationId", "type": "string"},
+      {"name": "owner", "type": "AvroPerson"},
+      {"name": "bic", "type": "string"},
+      {"name": "department", "type": "string"},
+      {"name": "localCurrency", "type": "string"},
+      {"name": "countryCode", "type": "string"},
+      {"name": "productId", "type": "string"},
+      {"name": "marketProduct", "type": ["null", "string"], "default": null},
+      {"name": "buyCustomerNumber", "type": "string"},
+      {"name": "buyAccountNumber", "type": "string"},
+      {"name": "buyCurrency", "type": "string"},
+      {"name": "buyValueDate", "type": {"type": "int", "logicalType": "date"}},
+      {"name": "sellCustomerNumber", "type": "string"},
+      {"name": "sellAccountNumber", "type": "string"},
+      {"name": "sellCurrency", "type": "string"},
+      {"name": "sellValueDate", "type": {"type": "int", "logicalType": "date"}},
+      {"name": "dealtSide", "type": "AvroSide"},
+      {"name": "dealtAmount", "type": {"type": "bytes", "logicalType": "decimal", "precision": 18, "scale": 2}},
+      {"name": "direction", "type": "AvroDirection"},
+      {"name": "transactionTime", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+      {"name": "registeringUser", "type": "string"},
+      {"name": "verifyingUser", "type": "string"},
+      {"name": "fxRate", "type": ["null", {"type": "bytes", "logicalType": "decimal", "precision": 18, "scale": 6}], "default": null},
+      {"name": "quotedAt", "type": ["null", {"type": "long", "logicalType": "timestamp-millis"}], "default": null},
+      {"name": "settledBuyAmount", "type": ["null", {"type": "bytes", "logicalType": "decimal", "precision": 20, "scale": 2}], "default": null},
+      {"name": "settledSellAmount", "type": ["null", {"type": "bytes", "logicalType": "decimal", "precision": 20, "scale": 2}], "default": null},
+      {"name": "settlementSystem", "type": ["null", "string"], "default": null},
+      {"name": "pricingType", "type": "AvroPricingType"},
+      {"name": "flow", "type": "AvroFxTransactionFlow"},
+      {"name": "status", "type": "AvroFxTransactionState"},
+      {"name": "appliedFxRateOfferId", "type": ["null", "string"], "default": null},
+      {"name": "reversesFxTransactionId", "type": ["null", "string"], "default": null}
+    ]
+  }
+]
