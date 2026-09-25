@@ -37,6 +37,22 @@ becomes:
 
 JSVRO deliberately does **not** use dictionary IDs, null bitmaps, delta encoding, or binary packing. Those techniques save more bytes but make terminal inspection substantially worse; if that level of optimization is needed, use a binary schema format such as Avro instead.
 
+## Performance at a glance
+
+Compared with plain Jackson JSON, from the [published benchmark run](#benchmark) of 25 September 2026 on the author's development machine:
+
+| JSVRO vs JSON | 10–50 rows | 100+ rows |
+|---|---|---|
+| Payload size | 39% smaller | 43% smaller |
+| Encode time | 12% less (1.14× faster) | 11% less (1.12× faster) |
+| Encode CPU | 13% less | 9% less |
+| Encode memory | the same | the same |
+| Decode time | 20% less (1.25× faster) | 28% less (1.38× faster) |
+| Decode CPU | 23% less | 27% less |
+| Decode memory | 2% less | 11% less |
+
+For the paged lists of 10–50 rows most APIs return, JSVRO sends 39% less data and encodes 12% and decodes 20% faster, using 13–23% less CPU and the same memory. Each column averages the row counts in its range, combined over the `Person`, `Area` and `FxTransaction` aggregate roots. Gains depend on the shape of your objects and your machine; see [Benchmark](#benchmark) for the disclaimer, the comparison with Avro and the full report.
+
 ## Modules
 
 - `jsvro-core` — schema derivation, cached codecs, streaming encoder and decoder
@@ -211,12 +227,12 @@ Avro is measured as an object container file without compression, using classes 
 ### Running the benchmark
 
 ```bash
-./benchmark -full                  # full run: 15 row counts from 10 to 100,000, about 50 minutes
+./benchmark -full                  # full run, as set in benchmark-full.properties
 ./benchmark -ri 10:1000 20:500     # custom run: rows:iterations pairs
 ./benchmark -publish               # publish the last full run
 ```
 
-A custom run takes any `rows:iterations` pairs, up to 100,000 rows and 10,000 iterations each. The full run uses 10,000 iterations for the smallest row counts and fewer as rows grow. Each measurement runs the same number of warm-up iterations first. Results print to the terminal and are written to `jsvro-core/build/reports/jsvro-benchmark/index.html`. The normal `./gradlew build` does not run the benchmark.
+A custom run takes any `rows:iterations` pairs, up to 100,000 rows and 10,000 iterations each. The full run's row counts and iterations are set in `jsvro-core/src/test/resources/benchmark-full.properties`, one `rows=iterations` line each, within the same limits. Each measurement runs the same number of warm-up iterations first. Results print to the terminal and are written to `jsvro-core/build/reports/jsvro-benchmark/index.html`. The normal `./gradlew build` does not run the benchmark.
 
 Only a full run can be published. `./benchmark -publish` copies the report to `docs/benchmark/index.html`, which GitHub Pages serves, and refreshes the summary tables above; after a custom run it refuses and asks for a full run.
 
