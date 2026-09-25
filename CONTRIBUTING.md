@@ -18,3 +18,4 @@ Before changing the wire format, update `SPEC.md` and add compatibility tests in
 - Existing JSVRO v1 wire output should not change accidentally.
 - Normal Spring JSON behavior must remain the default unless a client explicitly requests JSVRO.
 - Per-row encoding should avoid intermediate `JsonNode` trees.
+- Any good ideas for how to improve performance, push a forked example.
