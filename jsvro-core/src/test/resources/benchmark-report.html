@@ -71,6 +71,9 @@
     min-height: 100vh;
     box-sizing: border-box;
   }
+  .back { margin: 0 0 12px; font-size: 13px; }
+  .back a { color: var(--text-secondary); text-decoration: none; }
+  .back a:hover { color: var(--text-primary); }
   h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
   .subtitle { color: var(--text-secondary); font-size: 14px; margin: 0 0 16px; max-width: 960px; }
   .filters { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin: 0 0 8px; font-size: 13px; color: var(--text-secondary); }
@@ -120,6 +123,7 @@
 </head>
 <body>
 <div class="viz-root">
+  <p class="back"><a href="../">← JSVRO</a></p>
   <h1 id="title"></h1>
   <p class="subtitle" id="subtitle"></p>
   <div class="filters">
