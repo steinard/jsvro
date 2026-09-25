@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 usage() {
     cat <<'USAGE'
 Usage:
-  ./benchmark -full                 Full run: 15 row counts from 10 to 100,000 (about 50 minutes)
+  ./benchmark -full                 Full run, as set in jsvro-core/src/test/resources/benchmark-full.properties
   ./benchmark -ri 10:1000 20:500    Custom run: rows:iterations pairs (at most 100,000 rows and 10,000 iterations)
   ./benchmark -publish              Publish the last run to docs/benchmark and the README (full runs only)
 

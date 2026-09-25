@@ -1,16 +1,20 @@
 package dev.jsvro.core;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
+import java.io.StringReader;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.TreeMap;
 
 final class BenchmarkPlan {
-    private static final int MIN_ITERATIONS = 3;
     private static final int MAX_ITERATIONS = 10_000;
     private static final int MAX_ROWS = 100_000;
-    private static final String FULL_SIZES = "10,20,30,40,50,100,500,1000,3000,5000,10000,20000,30000,50000,100000";
-    private static final long FULL_ROW_BUDGET = 3_000_000L;
+    private static final String FULL_PLAN = "benchmark-full.properties";
 
     enum Mode { FULL, CUSTOM }
 
@@ -18,12 +22,45 @@ final class BenchmarkPlan {
     private final Map<Integer, Integer> iterationsByRows;
 
     private BenchmarkPlan(Mode mode, Map<Integer, Integer> iterationsByRows) {
+        if (iterationsByRows.isEmpty()) {
+            throw new IllegalArgumentException("A benchmark plan needs at least one rows:iterations entry");
+        }
         this.mode = mode;
         this.iterationsByRows = Map.copyOf(iterationsByRows);
     }
 
     static BenchmarkPlan full() {
-        return budgeted(FULL_SIZES, FULL_ROW_BUDGET);
+        try (InputStream resource = BenchmarkPlan.class.getResourceAsStream("/" + FULL_PLAN)) {
+            if (resource == null) {
+                throw new IllegalStateException(FULL_PLAN + " is missing from the test resources");
+            }
+            Properties properties = new Properties();
+            properties.load(resource);
+            return fromProperties(properties, FULL_PLAN);
+        }
+        catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
+    }
+
+    static BenchmarkPlan fromProperties(String properties) {
+        try (Reader reader = new StringReader(properties)) {
+            Properties loaded = new Properties();
+            loaded.load(reader);
+            return fromProperties(loaded, "the full plan");
+        }
+        catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
+    }
+
+    private static BenchmarkPlan fromProperties(Properties properties, String source) {
+        Map<Integer, Integer> iterationsByRows = new TreeMap<>();
+        for (String rows : properties.stringPropertyNames()) {
+            String iterations = properties.getProperty(rows);
+            add(iterationsByRows, rows, iterations, rows + "=" + iterations, source);
+        }
+        return new BenchmarkPlan(Mode.FULL, iterationsByRows);
     }
 
     static BenchmarkPlan explicit(String plan) {
@@ -33,27 +70,9 @@ final class BenchmarkPlan {
             if (parts.length != 2) {
                 throw new IllegalArgumentException("Expected rows:iterations but got '" + entry.trim() + "'");
             }
-            int rows = rows(parts[0], entry);
-            int iterations = positive(parts[1], "iterations", entry);
-            if (iterations > MAX_ITERATIONS) {
-                throw new IllegalArgumentException(
-                        "At most " + MAX_ITERATIONS + " iterations are allowed, but '" + entry.trim() + "' asks for " + iterations);
-            }
-            if (iterationsByRows.put(rows, iterations) != null) {
-                throw new IllegalArgumentException("Rows " + rows + " appear more than once in '" + plan + "'");
-            }
+            add(iterationsByRows, parts[0], parts[1], entry.trim(), "'" + plan + "'");
         }
         return new BenchmarkPlan(Mode.CUSTOM, iterationsByRows);
-    }
-
-    static BenchmarkPlan budgeted(String sizes, long rowBudget) {
-        Map<Integer, Integer> iterationsByRows = new TreeMap<>();
-        for (String size : sizes.split(",")) {
-            int rows = rows(size, size.trim());
-            long iterations = Math.max(MIN_ITERATIONS, Math.min(MAX_ITERATIONS, rowBudget / rows));
-            iterationsByRows.put(rows, (int) iterations);
-        }
-        return new BenchmarkPlan(Mode.FULL, iterationsByRows);
     }
 
     static BenchmarkPlan fromSystemProperties() {
@@ -84,13 +103,21 @@ final class BenchmarkPlan {
         return iterationsByRows.get(rows);
     }
 
-    private static int rows(String value, String entry) {
-        int rows = positive(value, "rows", entry);
+    private static void add(Map<Integer, Integer> iterationsByRows, String rowsText, String iterationsText,
+            String entry, String source) {
+        int rows = positive(rowsText, "rows", entry);
         if (rows > MAX_ROWS) {
             throw new IllegalArgumentException(
-                    "At most " + MAX_ROWS + " rows are allowed, but '" + entry.trim() + "' asks for " + rows);
+                    "At most " + MAX_ROWS + " rows are allowed, but '" + entry + "' asks for " + rows);
         }
-        return rows;
+        int iterations = positive(iterationsText, "iterations", entry);
+        if (iterations > MAX_ITERATIONS) {
+            throw new IllegalArgumentException(
+                    "At most " + MAX_ITERATIONS + " iterations are allowed, but '" + entry + "' asks for " + iterations);
+        }
+        if (iterationsByRows.put(rows, iterations) != null) {
+            throw new IllegalArgumentException("Rows " + rows + " appear more than once in " + source);
+        }
     }
 
     private static int positive(String value, String name, String entry) {
@@ -102,7 +129,7 @@ final class BenchmarkPlan {
         }
         catch (NumberFormatException ignored) {
         }
-        throw new IllegalArgumentException("Expected a positive number of " + name + " in '" + entry.trim() + "'");
+        throw new IllegalArgumentException("Expected a positive number of " + name + " in '" + entry + "'");
     }
 
     @Override
